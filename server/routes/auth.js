@@ -7,6 +7,11 @@ const { generateToken, authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
 
+// Test route to verify auth routes are loading
+router.get('/test', (req, res) => {
+  res.json({ message: 'Auth routes are working!' });
+});
+
 // Login endpoint
 router.post('/login', [
   body('email').isEmail().normalizeEmail(),
