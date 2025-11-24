@@ -9,30 +9,42 @@ const pool = new Pool({
 // Export db interface that matches SQLite for compatibility
 const db = {
   get: (sql, params) => {
+    console.log('PostgreSQL Query (get):', sql, params);
     return new Promise((resolve, reject) => {
       pool.query(sql, params)
         .then(result => {
           resolve(result.rows[0]);
         })
-        .catch(reject);
+        .catch(err => {
+          console.error('PostgreSQL Error (get):', err);
+          reject(err);
+        });
     });
   },
   all: (sql, params) => {
+    console.log('PostgreSQL Query (all):', sql, params);
     return new Promise((resolve, reject) => {
       pool.query(sql, params)
         .then(result => {
           resolve(result.rows);
         })
-        .catch(reject);
+        .catch(err => {
+          console.error('PostgreSQL Error (all):', err);
+          reject(err);
+        });
     });
   },
   run: (sql, params) => {
+    console.log('PostgreSQL Query (run):', sql, params);
     return new Promise((resolve, reject) => {
       pool.query(sql, params)
         .then(result => {
           resolve({ lastID: result.insertId, changes: result.rowCount });
         })
-        .catch(reject);
+        .catch(err => {
+          console.error('PostgreSQL Error (run):', err);
+          reject(err);
+        });
     });
   }
 };

@@ -19,6 +19,9 @@ const { initializeDatabase } = require('./database/postgres');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Trust proxy for Render
+app.set('trust proxy', true);
+
 // Force deploy - updated timestamp v2
 console.log('Starting server with PostgreSQL database...');
 
