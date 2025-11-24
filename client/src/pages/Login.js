@@ -59,9 +59,13 @@ const Login = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          ...registerData,
+          email: registerData.email,
+          password: registerData.password,
+          first_name: registerData.firstName,
+          last_name: registerData.lastName,
+          department: registerData.department,
           role: 'HR_Manager',
-          employmentDate: new Date().toISOString().split('T')[0]
+          employment_date: new Date().toISOString().split('T')[0]
         })
       });
       
