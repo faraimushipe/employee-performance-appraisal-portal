@@ -85,7 +85,7 @@ const departmentScope = (req, res, next) => {
 
 // Resource ownership middleware
 const checkResourceOwnership = (resourceType) => {
-  return (req, res, next) => {
+  return async (req, res, next) => {
     if (!req.user) {
       return res.status(401).json({ 
         error: 'Unauthorized', 
@@ -119,14 +119,9 @@ const checkResourceOwnership = (resourceType) => {
       WHERE u.id = ?
     `;
 
-    db.get(query, [req.user.id, resourceId], (err, row) => {
-      if (err) {
-        return res.status(500).json({ 
-          error: 'Database Error', 
-          message: 'Failed to verify resource ownership' 
-        });
-      }
-
+    try {
+      const row = await db.get(query, [req.user.id, resourceId]);
+      
       if (!row) {
         return res.status(404).json({ 
           error: 'Not Found', 
@@ -150,7 +145,12 @@ const checkResourceOwnership = (resourceType) => {
       }
 
       next();
-    });
+    } catch (err) {
+      return res.status(500).json({ 
+        error: 'Database Error', 
+        message: 'Failed to verify resource ownership' 
+      });
+    }
   };
 };
 

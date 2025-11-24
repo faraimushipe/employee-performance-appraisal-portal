@@ -414,15 +414,7 @@ router.delete('/:id', [
     }
 
     // Check if user exists
-    const user = await new Promise((resolve, reject) => {
-      db.get('SELECT * FROM Users WHERE id = ?', [userId], (err, row) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(row);
-        }
-      });
-    });
+    const user = await db.get('SELECT * FROM Users WHERE id = ?', [userId]);
 
     if (!user) {
       return res.status(404).json({
