@@ -19,6 +19,9 @@ const { initializeDatabase } = require('./database/postgres');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Force deploy - updated timestamp v2
+console.log('Starting server with PostgreSQL database...');
+
 // Security middleware
 app.use(helmet());
 app.use(compression());
