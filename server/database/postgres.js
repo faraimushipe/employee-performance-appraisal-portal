@@ -10,8 +10,15 @@ const pool = new Pool({
 const db = {
   get: (sql, params) => {
     console.log('PostgreSQL Query (get):', sql, params);
+    // Convert SQLite ? parameters to PostgreSQL $1, $2, etc.
+    let pgSql = sql;
+    if (params && params.length > 0) {
+      let paramIndex = 1;
+      pgSql = sql.replace(/\?/g, () => `$${paramIndex++}`);
+    }
+    console.log('Converted PostgreSQL Query:', pgSql, params);
     return new Promise((resolve, reject) => {
-      pool.query(sql, params)
+      pool.query(pgSql, params)
         .then(result => {
           resolve(result.rows[0]);
         })
@@ -23,8 +30,15 @@ const db = {
   },
   all: (sql, params) => {
     console.log('PostgreSQL Query (all):', sql, params);
+    // Convert SQLite ? parameters to PostgreSQL $1, $2, etc.
+    let pgSql = sql;
+    if (params && params.length > 0) {
+      let paramIndex = 1;
+      pgSql = sql.replace(/\?/g, () => `$${paramIndex++}`);
+    }
+    console.log('Converted PostgreSQL Query:', pgSql, params);
     return new Promise((resolve, reject) => {
-      pool.query(sql, params)
+      pool.query(pgSql, params)
         .then(result => {
           resolve(result.rows);
         })
@@ -36,8 +50,15 @@ const db = {
   },
   run: (sql, params) => {
     console.log('PostgreSQL Query (run):', sql, params);
+    // Convert SQLite ? parameters to PostgreSQL $1, $2, etc.
+    let pgSql = sql;
+    if (params && params.length > 0) {
+      let paramIndex = 1;
+      pgSql = sql.replace(/\?/g, () => `$${paramIndex++}`);
+    }
+    console.log('Converted PostgreSQL Query:', pgSql, params);
     return new Promise((resolve, reject) => {
-      pool.query(sql, params)
+      pool.query(pgSql, params)
         .then(result => {
           resolve({ lastID: result.insertId, changes: result.rowCount });
         })
