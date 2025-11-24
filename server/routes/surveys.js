@@ -276,8 +276,8 @@ router.get('/analytics', [
         survey_type,
         role,
         department,
-        response_data,
-        created_at
+        responses::text as response_data,
+        submitted_at as created_at
       FROM SurveyResponses
       WHERE 1=1
     `;
@@ -288,8 +288,7 @@ router.get('/analytics', [
       sql += ' AND department = ?';
       params.push(req.departmentScope);
     }
-
-    sql += ' ORDER BY created_at DESC';
+    sql += ' ORDER BY submitted_at DESC';
 
     try {
       const rows = await db.all(sql, params);
@@ -381,8 +380,8 @@ router.get('/stats', [
         role,
         department,
         COUNT(*) as response_count,
-        MIN(created_at) as first_response,
-        MAX(created_at) as last_response
+        MIN(submitted_at) as first_response,
+        MAX(submitted_at) as last_response
       FROM SurveyResponses
       WHERE 1=1
     `;
@@ -446,11 +445,11 @@ router.get('/export/:format', [
         u.department,
         u.role,
         sr.survey_type,
-        sr.response_data,
-        sr.created_at
+        sr.responses::text as response_data,
+        sr.submitted_at as created_at
       FROM SurveyResponses sr
       JOIN Users u ON sr.user_id = u.id
-      ORDER BY sr.created_at DESC
+      ORDER BY sr.submitted_at DESC
     `);
 
     if (format === 'json') {
