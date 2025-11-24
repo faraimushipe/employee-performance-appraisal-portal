@@ -196,7 +196,7 @@ router.post('/submit', [
 
     // Create survey response
     const result = await db.run(
-      `INSERT INTO SurveyResponses (user_id, survey_type, response_data, role, department)
+      `INSERT INTO SurveyResponses (user_id, survey_type, responses, role, department)
        VALUES (?, ?, ?, ?, ?)`,
       [userId, survey_type, JSON.stringify(response_data), userRole, department]
     );
@@ -227,11 +227,11 @@ router.get('/responses', [
       SELECT 
         id,
         survey_type,
-        response_data,
-        created_at
+        responses::text as response_data,
+        submitted_at as created_at
       FROM SurveyResponses
       WHERE user_id = ?
-      ORDER BY created_at DESC
+      ORDER BY submitted_at DESC
     `;
 
     try {
