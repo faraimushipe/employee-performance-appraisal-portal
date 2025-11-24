@@ -126,13 +126,10 @@ const Login = () => {
           </div>
 
           <div className="mt-6">
-            <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-              <h3 className="text-sm font-medium text-blue-800 mb-2">Demo Accounts</h3>
-              <div className="text-xs text-blue-700 space-y-1">
-                <div><strong>HR Manager:</strong> hr.manager@company.com / hr123456</div>
-                <div><strong>IT Supervisor:</strong> it.supervisor@company.com / it123456</div>
-                <div><strong>Finance Supervisor:</strong> finance.supervisor@company.com / finance123456</div>
-                <div><strong>Employee:</strong> john.doe@company.com / employee123</div>
+            <div className="bg-gray-50 border border-gray-200 rounded-md p-4">
+              <h3 className="text-sm font-medium text-gray-800 mb-2">First Time?</h3>
+              <div className="text-xs text-gray-700">
+                Register your HR Manager account to get started with the performance appraisal system.
               </div>
             </div>
           </div>
