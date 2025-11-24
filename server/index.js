@@ -101,13 +101,8 @@ app.use('*', (req, res) => {
 // Initialize database and start server
 const startServer = async () => {
   try {
-    if (process.env.NODE_ENV === 'production') {
-      await initializeDatabase();
-      console.log('PostgreSQL database initialized successfully');
-    } else {
-      await initializeDatabase();
-      console.log('SQLite database initialized successfully');
-    }
+    await initializeDatabase();
+    console.log('PostgreSQL database initialized successfully');
     
     const server = app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);

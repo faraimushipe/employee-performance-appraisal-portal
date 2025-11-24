@@ -6,6 +6,37 @@ const pool = new Pool({
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 
+// Export db interface that matches SQLite for compatibility
+const db = {
+  get: (sql, params) => {
+    return new Promise((resolve, reject) => {
+      pool.query(sql, params)
+        .then(result => {
+          resolve(result.rows[0]);
+        })
+        .catch(reject);
+    });
+  },
+  all: (sql, params) => {
+    return new Promise((resolve, reject) => {
+      pool.query(sql, params)
+        .then(result => {
+          resolve(result.rows);
+        })
+        .catch(reject);
+    });
+  },
+  run: (sql, params) => {
+    return new Promise((resolve, reject) => {
+      pool.query(sql, params)
+        .then(result => {
+          resolve({ lastID: result.insertId, changes: result.rowCount });
+        })
+        .catch(reject);
+    });
+  }
+};
+
 // Initialize PostgreSQL database
 const initializePostgresDB = async () => {
   try {
