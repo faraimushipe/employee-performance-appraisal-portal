@@ -13,10 +13,8 @@ const analyticsRoutes = require('./routes/analytics');
 const surveyRoutes = require('./routes/surveys');
 const developmentRoutes = require('./routes/development');
 
-// Use PostgreSQL for production, SQLite for development
-const { initializeDatabase } = process.env.NODE_ENV === 'production' 
-  ? require('./database/postgres') 
-  : require('./database/init');
+// Always use PostgreSQL for Render deployment
+const { initializeDatabase } = require('./database/postgres');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
