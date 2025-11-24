@@ -21,6 +21,19 @@ const PORT = process.env.PORT || 5000;
 // Trust proxy for Render
 app.set('trust proxy', true);
 
+// Simple CORS headers for school project - MUST come before rate limiting
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(200);
+  } else {
+    next();
+  }
+});
+
 // Force deploy - updated timestamp v2
 console.log('Starting server with PostgreSQL database...');
 
@@ -37,19 +50,6 @@ const limiter = rateLimit({
   legacyHeaders: false,
 });
 app.use('/api/', limiter);
-
-// Simple CORS headers for school project
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  
-  if (req.method === 'OPTIONS') {
-    res.sendStatus(200);
-  } else {
-    next();
-  }
-});
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));

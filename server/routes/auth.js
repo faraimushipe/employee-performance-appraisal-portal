@@ -99,12 +99,7 @@ router.post('/register', [
 ], async (req, res) => {
   try {
     // Allow registration if no users exist (first setup) or if HR Manager
-    const userCount = await new Promise((resolve, reject) => {
-      db.get('SELECT COUNT(*) as count FROM Users', [], (err, row) => {
-        if (err) reject(err);
-        else resolve(row.count);
-      });
-    });
+    const userCount = await db.get('SELECT COUNT(*) as count FROM Users', []);
 
     // If users exist, check if requester is HR Manager
     if (userCount > 0) {
@@ -136,19 +131,10 @@ router.post('/register', [
     const { email, password, first_name, last_name, department, role, employment_date } = req.body;
 
     // Check if user already exists
-    const existingUser = await new Promise((resolve, reject) => {
-      db.get(
-        'SELECT id FROM Users WHERE email = ?',
-        [email],
-        (err, row) => {
-          if (err) {
-            reject(err);
-          } else {
-            resolve(row);
-          }
-        }
-      );
-    });
+    const existingUser = await db.get(
+      'SELECT id FROM Users WHERE email = ?',
+      [email]
+    );
 
     if (existingUser) {
       return res.status(409).json({
@@ -161,20 +147,11 @@ router.post('/register', [
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Create user
-    const result = await new Promise((resolve, reject) => {
-      db.run(
-        `INSERT INTO Users (email, password_hash, first_name, last_name, department, role, employment_date)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [email, hashedPassword, first_name, last_name, department, role, employment_date],
-        function(err) {
-          if (err) {
-            reject(err);
-          } else {
-            resolve({ id: this.lastID });
-          }
-        }
-      );
-    });
+    const result = await db.run(
+      `INSERT INTO Users (email, password_hash, first_name, last_name, department, role, employment_date)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [email, hashedPassword, first_name, last_name, department, role, employment_date]
+    );
 
     res.status(201).json({
       message: 'User created successfully',
