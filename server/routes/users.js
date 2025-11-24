@@ -413,7 +413,7 @@ router.get('/stats/department', [
         SUM(CASE WHEN role = 'HR_Manager' THEN 1 ELSE 0 END) as hr_managers,
         SUM(CASE WHEN role = 'Department_Supervisor' THEN 1 ELSE 0 END) as supervisors,
         SUM(CASE WHEN role = 'Employee' THEN 1 ELSE 0 END) as employees,
-        AVG(julianday('now') - julianday(employment_date)) as avg_tenure_days
+        AVG(CURRENT_DATE - employment_date) as avg_tenure_days
       FROM Users
       WHERE is_active = 1
     `;
