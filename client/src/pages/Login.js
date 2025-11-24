@@ -65,7 +65,7 @@ const Login = () => {
           last_name: registerData.lastName,
           department: registerData.department,
           role: 'HR_Manager',
-          employment_date: new Date().toISOString().split('T')[0]
+          employment_date: new Date().toISOString()
         })
       });
       
