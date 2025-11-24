@@ -11,6 +11,15 @@ const Login = () => {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showRegister, setShowRegister] = useState(false);
+  const [registerLoading, setRegisterLoading] = useState(false);
+  const [registerData, setRegisterData] = useState({
+    email: '',
+    password: '',
+    firstName: '',
+    lastName: '',
+    department: 'HR'
+  });
   const { login } = useAuth();
   const navigate = useNavigate();
 
@@ -38,6 +47,42 @@ const Login = () => {
       toast.error('An unexpected error occurred');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRegister = async () => {
+    setRegisterLoading(true);
+    try {
+      const response = await fetch('https://epap-backend.onrender.com/api/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...registerData,
+          role: 'HR_Manager',
+          employmentDate: new Date().toISOString().split('T')[0]
+        })
+      });
+      
+      if (response.ok) {
+        toast.success('Registration successful! Please login.');
+        setShowRegister(false);
+        setRegisterData({
+          email: '',
+          password: '',
+          firstName: '',
+          lastName: '',
+          department: 'HR'
+        });
+      } else {
+        const error = await response.json();
+        toast.error(error.message || 'Registration failed');
+      }
+    } catch (error) {
+      toast.error('Registration failed');
+    } finally {
+      setRegisterLoading(false);
     }
   };
 
@@ -128,11 +173,69 @@ const Login = () => {
           <div className="mt-6">
             <div className="bg-gray-50 border border-gray-200 rounded-md p-4">
               <h3 className="text-sm font-medium text-gray-800 mb-2">First Time?</h3>
-              <div className="text-xs text-gray-700">
+              <div className="text-xs text-gray-700 mb-3">
                 Register your HR Manager account to get started with the performance appraisal system.
               </div>
+              <button
+                type="button"
+                onClick={() => setShowRegister(!showRegister)}
+                className="w-full text-center bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 text-sm font-medium"
+              >
+                {showRegister ? 'Cancel' : 'Register HR Manager Account'}
+              </button>
             </div>
           </div>
+
+          {showRegister && (
+            <div className="mt-6 bg-blue-50 border border-blue-200 rounded-md p-4">
+              <h3 className="text-sm font-medium text-blue-800 mb-3">Register HR Manager</h3>
+              <div className="space-y-3">
+                <input
+                  type="email"
+                  placeholder="Email (hr.manager@company.com)"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  value={registerData.email}
+                  onChange={(e) => setRegisterData({...registerData, email: e.target.value})}
+                />
+                <input
+                  type="password"
+                  placeholder="Password (hr123456)"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  value={registerData.password}
+                  onChange={(e) => setRegisterData({...registerData, password: e.target.value})}
+                />
+                <input
+                  type="text"
+                  placeholder="First Name"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  value={registerData.firstName}
+                  onChange={(e) => setRegisterData({...registerData, firstName: e.target.value})}
+                />
+                <input
+                  type="text"
+                  placeholder="Last Name"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  value={registerData.lastName}
+                  onChange={(e) => setRegisterData({...registerData, lastName: e.target.value})}
+                />
+                <select
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  value={registerData.department}
+                  onChange={(e) => setRegisterData({...registerData, department: e.target.value})}
+                >
+                  <option value="HR">HR</option>
+                </select>
+                <button
+                  type="button"
+                  onClick={handleRegister}
+                  disabled={registerLoading}
+                  className="w-full bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 text-sm font-medium disabled:opacity-50"
+                >
+                  {registerLoading ? 'Registering...' : 'Register Account'}
+                </button>
+              </div>
+            </div>
+          )}
         </form>
       </div>
     </div>
