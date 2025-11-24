@@ -161,6 +161,7 @@ const createAuditLogsTable = async () => {
 };
 
 module.exports = {
+  db,
   pool,
-  initializePostgresDB
+  initializeDatabase: initializePostgresDB
 };
