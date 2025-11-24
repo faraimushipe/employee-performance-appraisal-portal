@@ -100,7 +100,7 @@ router.post('/', [
     // Insert new user
     const sql = `
       INSERT INTO Users (first_name, last_name, email, password_hash, department, role, employment_date, is_active, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      VALUES (?, ?, ?, ?, ?, ?, ?, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
     `;
 
     const result = await db.run(sql, [first_name, last_name, email, hashedPassword, department, role, employment_date]);
@@ -324,7 +324,7 @@ router.put('/:id', [
     }
     if (is_active !== undefined) {
       updates.push('is_active = ?');
-      values.push(is_active ? 1 : 0);
+      values.push(is_active ? true : false);
     }
 
     if (updates.length === 0) {
@@ -383,7 +383,7 @@ router.delete('/:id', [
 
     // Soft delete (deactivate)
     await db.run(
-      'UPDATE Users SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      'UPDATE Users SET is_active = false, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
       [userId]
     );
 

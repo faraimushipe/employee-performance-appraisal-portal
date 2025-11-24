@@ -520,7 +520,7 @@ router.get('/stats/overview', [
         pr.status,
         COUNT(*) as count,
         e.department,
-        AVG(CAST((pr.ratings->>'overall') AS REAL)) as avg_overall_rating
+        AVG(CAST((pr.ratings->>'overall') AS FLOAT)) as avg_overall_rating
       FROM PerformanceReviews pr
       JOIN Users e ON pr.employee_id = e.id
       WHERE 1=1

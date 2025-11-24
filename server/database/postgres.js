@@ -21,6 +21,13 @@ const db = {
       // Fix boolean comparisons (SQLite uses 1/0, PostgreSQL uses true/false)
       pgSql = pgSql.replace(/= 1(?!\d)/g, '= true');
       pgSql = pgSql.replace(/= 0(?!\d)/g, '= false');
+      
+      // Convert boolean parameters (SQLite uses 1/0, PostgreSQL uses true/false)
+      pgParams = pgParams.map(param => {
+        if (param === 1) return true;
+        if (param === 0) return false;
+        return param;
+      });
     }
     console.log('Converted PostgreSQL Query:', pgSql, pgParams);
     return new Promise((resolve, reject) => {
@@ -47,6 +54,13 @@ const db = {
       // Fix boolean comparisons (SQLite uses 1/0, PostgreSQL uses true/false)
       pgSql = pgSql.replace(/= 1(?!\d)/g, '= true');
       pgSql = pgSql.replace(/= 0(?!\d)/g, '= false');
+      
+      // Convert boolean parameters (SQLite uses 1/0, PostgreSQL uses true/false)
+      pgParams = pgParams.map(param => {
+        if (param === 1) return true;
+        if (param === 0) return false;
+        return param;
+      });
     }
     console.log('Converted PostgreSQL Query:', pgSql, pgParams);
     return new Promise((resolve, reject) => {
@@ -73,6 +87,13 @@ const db = {
       // Fix boolean comparisons (SQLite uses 1/0, PostgreSQL uses true/false)
       pgSql = pgSql.replace(/= 1(?!\d)/g, '= true');
       pgSql = pgSql.replace(/= 0(?!\d)/g, '= false');
+      
+      // Convert boolean parameters (SQLite uses 1/0, PostgreSQL uses true/false)
+      pgParams = pgParams.map(param => {
+        if (param === 1) return true;
+        if (param === 0) return false;
+        return param;
+      });
     }
     console.log('Converted PostgreSQL Query:', pgSql, pgParams);
     return new Promise((resolve, reject) => {
