@@ -38,7 +38,7 @@ app.use('/api/', limiter);
 
 // CORS configuration
 app.use(cors({
-  origin: true, // process.env.CLIENT_URL || 'http://localhost:3000',
+  origin: ['https://epap-frontend.onrender.com', 'http://localhost:3000'],
   credentials: true
 }));
 
