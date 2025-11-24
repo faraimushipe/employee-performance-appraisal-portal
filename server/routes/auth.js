@@ -1,5 +1,6 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
 const { db } = require('../database/postgres');
 const { generateToken, authenticateToken } = require('../middleware/auth');
@@ -81,9 +82,8 @@ router.post('/login', [
   }
 });
 
-// Register endpoint (only for HR_Manager)
+// Register endpoint (public for first HR Manager)
 router.post('/register', [
-  authenticateToken,
   body('email').isEmail().normalizeEmail(),
   body('password').isLength({ min: 6 }),
   body('first_name').notEmpty().trim(),
@@ -93,12 +93,31 @@ router.post('/register', [
   body('employment_date').isISO8601()
 ], async (req, res) => {
   try {
-    // Check if user is HR_Manager
-    if (req.user.role !== 'HR_Manager') {
-      return res.status(403).json({
-        error: 'Forbidden',
-        message: 'Only HR Managers can register new users'
+    // Allow registration if no users exist (first setup) or if HR Manager
+    const userCount = await new Promise((resolve, reject) => {
+      db.get('SELECT COUNT(*) as count FROM Users', [], (err, row) => {
+        if (err) reject(err);
+        else resolve(row.count);
       });
+    });
+
+    // If users exist, check if requester is HR Manager
+    if (userCount > 0) {
+      const token = req.headers.authorization?.split(' ')[1];
+      if (!token) {
+        return res.status(401).json({
+          error: 'Unauthorized',
+          message: 'Token required for registration'
+        });
+      }
+      
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production');
+      if (decoded.role !== 'HR_Manager') {
+        return res.status(403).json({
+          error: 'Forbidden',
+          message: 'Only HR Managers can register new users'
+        });
+      }
     }
 
     const errors = validationResult(req);
