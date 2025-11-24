@@ -80,7 +80,7 @@ router.get('/', [
 router.get('/:id', [
   authenticateToken,
   checkPermission('reviews', 'read')
-], (req, res) => {
+], async (req, res) => {
   try {
     const reviewId = req.params.id;
 

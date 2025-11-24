@@ -75,7 +75,7 @@ router.get('/', [
 router.get('/:id', [
   authenticateToken,
   checkPermission('development', 'read')
-], (req, res) => {
+], async (req, res) => {
   try {
     const planId = req.params.id;
 

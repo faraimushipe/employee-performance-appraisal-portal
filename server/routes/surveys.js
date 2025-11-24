@@ -237,7 +237,7 @@ router.post('/submit', [
 router.get('/responses', [
   authenticateToken,
   checkPermission('surveys', 'read')
-], (req, res) => {
+], async (req, res) => {
   try {
     const userId = req.user.id;
 

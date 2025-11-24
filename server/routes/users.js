@@ -199,7 +199,7 @@ router.post('/:id/reset-password', [
 router.get('/:id', [
   authenticateToken,
   checkPermission('users', 'read')
-], (req, res) => {
+], async (req, res) => {
   try {
     const userId = req.params.id;
 
