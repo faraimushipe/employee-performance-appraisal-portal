@@ -18,7 +18,8 @@ const Login = () => {
     password: '',
     firstName: '',
     lastName: '',
-    department: 'HR'
+    department: 'HR',
+    employmentDate: ''
   });
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -65,7 +66,7 @@ const Login = () => {
           last_name: registerData.lastName,
           department: registerData.department,
           role: 'HR_Manager',
-          employment_date: new Date().toISOString()
+          employment_date: registerData.employmentDate || new Date().toISOString()
         })
       });
       
@@ -77,7 +78,8 @@ const Login = () => {
           password: '',
           firstName: '',
           lastName: '',
-          department: 'HR'
+          department: 'HR',
+          employmentDate: ''
         });
       } else {
         const error = await response.json();
@@ -229,6 +231,12 @@ const Login = () => {
                 >
                   <option value="HR">HR</option>
                 </select>
+                <input
+                  type="date"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  value={registerData.employmentDate || ''}
+                  onChange={(e) => setRegisterData({...registerData, employmentDate: e.target.value})}
+                />
                 <button
                   type="button"
                   onClick={handleRegister}
