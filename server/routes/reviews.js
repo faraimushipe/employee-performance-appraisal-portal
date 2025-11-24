@@ -535,19 +535,19 @@ router.get('/stats/overview', [
 
     sql += ' GROUP BY pr.status, e.department ORDER BY e.department, pr.status';
 
-    db.all(sql, params, (err, rows) => {
-      if (err) {
-        console.error('Database error:', err);
-        return res.status(500).json({
-          error: 'Database Error',
-          message: 'Failed to fetch review statistics'
-        });
-      }
-
+    try {
+      const rows = await db.all(sql, params);
+      
       res.json({
         review_stats: rows
       });
-    });
+    } catch (err) {
+      console.error('Database error:', err);
+      return res.status(500).json({
+        error: 'Database Error',
+        message: 'Failed to fetch review statistics'
+      });
+    }
 
   } catch (error) {
     console.error('Get review stats error:', error);

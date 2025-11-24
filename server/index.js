@@ -101,31 +101,13 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Serve static files from React app (if in production)
-if (process.env.NODE_ENV === 'production') {
-  const path = require('path');
-  app.use(express.static(path.join(__dirname, '../client/build')));
-  
-  // For any route that isn't an API route, serve the React app
-  app.get('*', (req, res) => {
-    if (!req.path.startsWith('/api')) {
-      res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
-    } else {
-      res.status(404).json({
-        error: 'Not Found',
-        message: 'The requested API resource was not found'
-      });
-    }
+// 404 handler
+app.use('*', (req, res) => {
+  res.status(404).json({
+    error: 'Not Found',
+    message: 'The requested resource was not found'
   });
-} else {
-  // 404 handler for development
-  app.use('*', (req, res) => {
-    res.status(404).json({
-      error: 'Not Found',
-      message: 'The requested resource was not found'
-    });
-  });
-}
+});
 
 // Initialize database and start server
 const startServer = async () => {

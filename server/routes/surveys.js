@@ -269,7 +269,7 @@ router.get('/analytics', [
   authorize('HR_Manager', 'Department_Supervisor'),
   departmentScope,
   checkPermission('surveys', 'analyze')
-], (req, res) => {
+], async (req, res) => {
   try {
     let sql = `
       SELECT 
@@ -291,15 +291,9 @@ router.get('/analytics', [
 
     sql += ' ORDER BY created_at DESC';
 
-    db.all(sql, params, (err, rows) => {
-      if (err) {
-        console.error('Database error:', err);
-        return res.status(500).json({
-          error: 'Database Error',
-          message: 'Failed to fetch survey analytics'
-        });
-      }
-
+    try {
+      const rows = await db.all(sql, params);
+      
       // Process responses for analytics
       const analytics = {};
       
@@ -352,10 +346,17 @@ router.get('/analytics', [
       });
 
       res.json({
-        survey_analytics: analytics,
+        analytics: analytics,
+        total_responses: rows.length,
         generated_at: new Date().toISOString()
       });
-    });
+    } catch (err) {
+      console.error('Database error:', err);
+      return res.status(500).json({
+        error: 'Database Error',
+        message: 'Failed to fetch survey analytics'
+      });
+    }
 
   } catch (error) {
     console.error('Get survey analytics error:', error);
@@ -372,7 +373,7 @@ router.get('/stats', [
   authorize('HR_Manager', 'Department_Supervisor'),
   departmentScope,
   checkPermission('surveys', 'analyze')
-], (req, res) => {
+], async (req, res) => {
   try {
     let sql = `
       SELECT 
@@ -395,20 +396,20 @@ router.get('/stats', [
 
     sql += ' GROUP BY survey_type, role, department ORDER BY survey_type, role, department';
 
-    db.all(sql, params, (err, rows) => {
-      if (err) {
-        console.error('Database error:', err);
-        return res.status(500).json({
-          error: 'Database Error',
-          message: 'Failed to fetch survey statistics'
-        });
-      }
-
+    try {
+      const rows = await db.all(sql, params);
+      
       res.json({
         survey_statistics: rows,
         generated_at: new Date().toISOString()
       });
-    });
+    } catch (err) {
+      console.error('Database error:', err);
+      return res.status(500).json({
+        error: 'Database Error',
+        message: 'Failed to fetch survey statistics'
+      });
+    }
 
   } catch (error) {
     console.error('Get survey stats error:', error);

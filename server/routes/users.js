@@ -10,7 +10,7 @@ router.get('/', [
   authenticateToken,
   departmentScope,
   checkPermission('users', 'read')
-], (req, res) => {
+], async (req, res) => {
   try {
     let sql = `
       SELECT id, email, first_name, last_name, department, role, employment_date, is_active, created_at
@@ -35,20 +35,20 @@ router.get('/', [
 
     sql += ' ORDER BY department, last_name, first_name';
 
-    db.all(sql, params, (err, rows) => {
-      if (err) {
-        console.error('Database error:', err);
-        return res.status(500).json({
-          error: 'Database Error',
-          message: 'Failed to fetch users'
-        });
-      }
-
+    try {
+      const rows = await db.all(sql, params);
+      
       res.json({
         users: rows,
         count: rows.length
       });
-    });
+    } catch (err) {
+      console.error('Database error:', err);
+      return res.status(500).json({
+        error: 'Database Error',
+        message: 'Failed to fetch users'
+      });
+    }
 
   } catch (error) {
     console.error('Get users error:', error);
@@ -404,7 +404,7 @@ router.delete('/:id', [
 router.get('/stats/department', [
   authenticateToken,
   checkPermission('users', 'read')
-], (req, res) => {
+], async (req, res) => {
   try {
     let sql = `
       SELECT 
@@ -427,19 +427,19 @@ router.get('/stats/department', [
 
     sql += ' GROUP BY department ORDER BY department';
 
-    db.all(sql, params, (err, rows) => {
-      if (err) {
-        console.error('Database error:', err);
-        return res.status(500).json({
-          error: 'Database Error',
-          message: 'Failed to fetch department statistics'
-        });
-      }
-
+    try {
+      const rows = await db.all(sql, params);
+      
       res.json({
         department_stats: rows
       });
-    });
+    } catch (err) {
+      console.error('Database error:', err);
+      return res.status(500).json({
+        error: 'Database Error',
+        message: 'Failed to fetch department statistics'
+      });
+    }
 
   } catch (error) {
     console.error('Get department stats error:', error);
@@ -454,7 +454,7 @@ router.get('/stats/department', [
 router.get('/stats/roles', [
   authenticateToken,
   checkPermission('users', 'read')
-], (req, res) => {
+], async (req, res) => {
   try {
     let sql = `
       SELECT 
@@ -474,19 +474,19 @@ router.get('/stats/roles', [
 
     sql += ' GROUP BY role ORDER BY count DESC';
 
-    db.all(sql, params, (err, rows) => {
-      if (err) {
-        console.error('Database error:', err);
-        return res.status(500).json({
-          error: 'Database Error',
-          message: 'Failed to fetch role statistics'
-        });
-      }
-
+    try {
+      const rows = await db.all(sql, params);
+      
       res.json({
-        role_distribution: rows
+        role_stats: rows
       });
-    });
+    } catch (err) {
+      console.error('Database error:', err);
+      return res.status(500).json({
+        error: 'Database Error',
+        message: 'Failed to fetch role statistics'
+      });
+    }
 
   } catch (error) {
     console.error('Get role stats error:', error);

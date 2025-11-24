@@ -548,7 +548,7 @@ router.get('/stats/overview', [
 router.get('/stats/skills', [
   authenticateToken,
   checkPermission('development', 'read')
-], (req, res) => {
+], async (req, res) => {
   try {
     let sql = `
       SELECT 
@@ -571,19 +571,19 @@ router.get('/stats/skills', [
 
     sql += ' GROUP BY dp.skill_category ORDER BY count DESC';
 
-    db.all(sql, params, (err, rows) => {
-      if (err) {
-        console.error('Database error:', err);
-        return res.status(500).json({
-          error: 'Database Error',
-          message: 'Failed to fetch skill statistics'
-        });
-      }
-
+    try {
+      const rows = await db.all(sql, params);
+      
       res.json({
         skill_statistics: rows
       });
-    });
+    } catch (err) {
+      console.error('Database error:', err);
+      return res.status(500).json({
+        error: 'Database Error',
+        message: 'Failed to fetch skill statistics'
+      });
+    }
 
   } catch (error) {
     console.error('Get skill stats error:', error);

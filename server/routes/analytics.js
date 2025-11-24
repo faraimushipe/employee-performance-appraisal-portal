@@ -72,10 +72,10 @@ router.get('/comprehensive', [
       SELECT 
         e.department,
         COUNT(pr.id) as total_reviews,
-        AVG(CAST((pr.ratings->>'overall') AS REAL)) as avg_overall_rating,
-        AVG(CAST((pr.ratings->>'technical') AS REAL)) as avg_technical_rating,
-        AVG(CAST((pr.ratings->>'communication') AS REAL)) as avg_communication_rating,
-        AVG(CAST((pr.ratings->>'leadership') AS REAL)) as avg_leadership_rating
+        AVG(CAST((pr.ratings->>'overall') AS FLOAT)) as avg_overall_rating,
+        AVG(CAST((pr.ratings->>'technical') AS FLOAT)) as avg_technical_rating,
+        AVG(CAST((pr.ratings->>'communication') AS FLOAT)) as avg_communication_rating,
+        AVG(CAST((pr.ratings->>'leadership') AS FLOAT)) as avg_leadership_rating
       FROM PerformanceReviews pr
       JOIN Users e ON pr.employee_id = e.id
       WHERE pr.status = 'approved'
@@ -102,14 +102,14 @@ router.get('/comprehensive', [
         
         // Get individual ratings for t-test
         const dept1Ratings = await db.all(`
-          SELECT CAST((pr.ratings->>'overall') AS REAL) as rating
+          SELECT CAST((pr.ratings->>'overall') AS FLOAT) as rating
           FROM PerformanceReviews pr
           JOIN Users e ON pr.employee_id = e.id
           WHERE e.department = ? AND pr.status = 'approved'
         `, [dept1]).then(rows => rows.map(row => row.rating));
 
         const dept2Ratings = await db.all(`
-          SELECT CAST((pr.ratings->>'overall') AS REAL) as rating
+          SELECT CAST((pr.ratings->>'overall') AS FLOAT) as rating
           FROM PerformanceReviews pr
           JOIN Users e ON pr.employee_id = e.id
           WHERE e.department = ? AND pr.status = 'approved'
@@ -125,12 +125,12 @@ router.get('/comprehensive', [
     // Organization-wide trends
     const monthlyTrends = await db.all(`
       SELECT 
-        strftime('%Y-%m', pr.created_at) as month,
+        TO_CHAR(pr.created_at, 'YYYY-MM') as month,
         COUNT(pr.id) as reviews_count,
-        AVG(CAST((pr.ratings->>'overall') AS REAL)) as avg_rating
+        AVG(CAST((pr.ratings->>'overall') AS FLOAT)) as avg_rating
       FROM PerformanceReviews pr
       WHERE pr.status = 'approved'
-      GROUP BY strftime('%Y-%m', pr.created_at)
+      GROUP BY TO_CHAR(pr.created_at, 'YYYY-MM')
       ORDER BY month DESC
       LIMIT 12
     `);
@@ -201,7 +201,7 @@ router.get('/department', [
         e.last_name,
         e.role,
         COUNT(pr.id) as total_reviews,
-        AVG(CAST((pr.ratings->>'overall') AS REAL)) as avg_overall_rating,
+        AVG(CAST((pr.ratings->>'overall') AS FLOAT)) as avg_overall_rating,
         MAX(pr.created_at) as last_review_date
       FROM Users e
       LEFT JOIN PerformanceReviews pr ON e.id = pr.employee_id AND pr.status = 'approved'
@@ -315,10 +315,10 @@ router.get('/personal', [
       SELECT 
         pr.review_period,
         pr.created_at,
-        CAST((pr.ratings->>'overall') AS REAL) as overall_rating,
-        CAST((pr.ratings->>'technical') AS REAL) as technical_rating,
-        CAST((pr.ratings->>'communication') AS REAL) as communication_rating,
-        CAST((pr.ratings->>'leadership') AS REAL) as leadership_rating
+        CAST((pr.ratings->>'overall') AS FLOAT) as overall_rating,
+        CAST((pr.ratings->>'technical') AS FLOAT) as technical_rating,
+        CAST((pr.ratings->>'communication') AS FLOAT) as communication_rating,
+        CAST((pr.ratings->>'leadership') AS FLOAT) as leadership_rating
       FROM PerformanceReviews pr
       WHERE pr.employee_id = ? AND pr.status = 'approved'
       ORDER BY pr.created_at ASC
@@ -367,7 +367,7 @@ router.get('/personal', [
     // Anonymized peer comparison (department average)
     const peerComparison = await db.get(`
       SELECT 
-        AVG(CAST((pr.ratings->>'overall') AS REAL)) as dept_avg_rating,
+        AVG(CAST((pr.ratings->>'overall') AS FLOAT)) as dept_avg_rating,
         COUNT(pr.id) as dept_total_reviews
       FROM PerformanceReviews pr
       JOIN Users e ON pr.employee_id = e.id
