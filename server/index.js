@@ -1,5 +1,4 @@
 const express = require('express');
-const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const compression = require('compression');
@@ -22,11 +21,8 @@ const PORT = process.env.PORT || 5000;
 // Trust proxy for Render
 app.set('trust proxy', true);
 
-// CORS configuration - MUST come first!
-app.use(cors({
-  origin: ['https://epap-frontend.onrender.com', 'http://localhost:3000'],
-  credentials: true
-}));
+// Force deploy - updated timestamp v2
+console.log('Starting server with PostgreSQL database...');
 
 // Security middleware
 app.use(helmet());
@@ -42,15 +38,15 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
+// CORS disabled for school project
+// No CORS restrictions - allow all origins
+
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // Logging
 app.use(morgan('combined'));
-
-// Force deploy - updated timestamp v3
-console.log('Starting server with PostgreSQL database...');
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
