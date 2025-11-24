@@ -98,15 +98,9 @@ router.get('/:id', [
       WHERE pr.id = ?
     `;
 
-    db.get(sql, [reviewId], (err, row) => {
-      if (err) {
-        console.error('Database error:', err);
-        return res.status(500).json({
-          error: 'Database Error',
-          message: 'Failed to fetch performance review'
-        });
-      }
-
+    try {
+      const row = await db.get(sql, [reviewId]);
+      
       if (!row) {
         return res.status(404).json({
           error: 'Not Found',
@@ -138,7 +132,13 @@ router.get('/:id', [
       };
 
       res.json({ review });
-    });
+    } catch (err) {
+      console.error('Database error:', err);
+      return res.status(500).json({
+        error: 'Database Error',
+        message: 'Failed to fetch performance review'
+      });
+    }
 
   } catch (error) {
     console.error('Get review error:', error);

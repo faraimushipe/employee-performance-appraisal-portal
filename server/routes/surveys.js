@@ -252,15 +252,9 @@ router.get('/responses', [
       ORDER BY created_at DESC
     `;
 
-    db.all(sql, [userId], (err, rows) => {
-      if (err) {
-        console.error('Database error:', err);
-        return res.status(500).json({
-          error: 'Database Error',
-          message: 'Failed to fetch survey responses'
-        });
-      }
-
+    try {
+      const rows = await db.all(sql, [userId]);
+      
       const responses = rows.map(row => ({
         ...row,
         response_data: JSON.parse(row.response_data)
@@ -270,7 +264,13 @@ router.get('/responses', [
         responses,
         count: responses.length
       });
-    });
+    } catch (err) {
+      console.error('Database error:', err);
+      return res.status(500).json({
+        error: 'Database Error',
+        message: 'Failed to fetch survey responses'
+      });
+    }
 
   } catch (error) {
     console.error('Get survey responses error:', error);
@@ -454,31 +454,21 @@ router.get('/export/:format', [
     }
 
     // Get all survey data for export
-    const exportData = await new Promise((resolve, reject) => {
-      const sql = `
-        SELECT 
-          sr.id as response_id,
-          u.id as user_id,
-          u.first_name,
-          u.last_name,
-          u.department,
-          u.role,
-          sr.survey_type,
-          sr.response_data,
-          sr.created_at
-        FROM SurveyResponses sr
-        JOIN Users u ON sr.user_id = u.id
-        ORDER BY sr.created_at DESC
-      `;
-      
-      db.all(sql, [], (err, rows) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(rows);
-        }
-      });
-    });
+    const exportData = await db.all(`
+      SELECT 
+        sr.id as response_id,
+        u.id as user_id,
+        u.first_name,
+        u.last_name,
+        u.department,
+        u.role,
+        sr.survey_type,
+        sr.response_data,
+        sr.created_at
+      FROM SurveyResponses sr
+      JOIN Users u ON sr.user_id = u.id
+      ORDER BY sr.created_at DESC
+    `);
 
     if (format === 'json') {
       res.json({

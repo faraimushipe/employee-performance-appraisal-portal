@@ -83,15 +83,7 @@ router.post('/', [
     const { first_name, last_name, email, department, role, employment_date } = req.body;
 
     // Check if email already exists
-    const existingUser = await new Promise((resolve, reject) => {
-      db.get('SELECT id FROM Users WHERE email = ?', [email], (err, row) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(row);
-        }
-      });
-    });
+    const existingUser = await db.get('SELECT id FROM Users WHERE email = ?', [email]);
 
     if (existingUser) {
       return res.status(409).json({
@@ -160,15 +152,7 @@ router.post('/:id/reset-password', [
     const userId = req.params.id;
 
     // Check if user exists
-    const user = await new Promise((resolve, reject) => {
-      db.get('SELECT * FROM Users WHERE id = ?', [userId], (err, row) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(row);
-        }
-      });
-    });
+    const user = await db.get('SELECT * FROM Users WHERE id = ?', [userId]);
 
     if (!user) {
       return res.status(404).json({
@@ -233,15 +217,9 @@ router.get('/:id', [
       WHERE id = ? AND is_active = 1
     `;
 
-    db.get(sql, [userId], (err, row) => {
-      if (err) {
-        console.error('Database error:', err);
-        return res.status(500).json({
-          error: 'Database Error',
-          message: 'Failed to fetch user'
-        });
-      }
-
+    try {
+      const row = await db.get(sql, [userId]);
+      
       if (!row) {
         return res.status(404).json({
           error: 'Not Found',
@@ -258,7 +236,13 @@ router.get('/:id', [
       }
 
       res.json({ user: row });
-    });
+    } catch (err) {
+      console.error('Database error:', err);
+      return res.status(500).json({
+        error: 'Database Error',
+        message: 'Failed to fetch user'
+      });
+    }
 
   } catch (error) {
     console.error('Get user error:', error);
@@ -301,15 +285,7 @@ router.put('/:id', [
     }
 
     // Get current user data for audit log
-    const currentUser = await new Promise((resolve, reject) => {
-      db.get('SELECT * FROM Users WHERE id = ?', [userId], (err, row) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(row);
-        }
-      });
-    });
+    const currentUser = await db.get('SELECT * FROM Users WHERE id = ?', [userId]);
 
     if (!currentUser) {
       return res.status(404).json({
@@ -456,19 +432,10 @@ router.delete('/:id', [
     }
 
     // Soft delete (deactivate)
-    await new Promise((resolve, reject) => {
-      db.run(
-        'UPDATE Users SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-        [userId],
-        function(err) {
-          if (err) {
-            reject(err);
-          } else {
-            resolve();
-          }
-        }
-      );
-    });
+    await db.run(
+      'UPDATE Users SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [userId]
+    );
 
     res.json({
       message: 'User deactivated successfully'

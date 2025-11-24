@@ -29,19 +29,10 @@ router.post('/login', [
     const { email, password } = req.body;
 
     // Find user by email
-    const user = await new Promise((resolve, reject) => {
-      db.get(
-        'SELECT * FROM Users WHERE email = ? AND is_active = 1',
-        [email],
-        (err, row) => {
-          if (err) {
-            reject(err);
-          } else {
-            resolve(row);
-          }
-        }
-      );
-    });
+    const user = await db.get(
+      'SELECT * FROM Users WHERE email = ? AND is_active = 1',
+      [email]
+    );
 
     if (!user) {
       return res.status(401).json({

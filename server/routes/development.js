@@ -90,15 +90,9 @@ router.get('/:id', [
       WHERE dp.id = ?
     `;
 
-    db.get(sql, [planId], (err, row) => {
-      if (err) {
-        console.error('Database error:', err);
-        return res.status(500).json({
-          error: 'Database Error',
-          message: 'Failed to fetch development plan'
-        });
-      }
-
+    try {
+      const row = await db.get(sql, [planId]);
+      
       if (!row) {
         return res.status(404).json({
           error: 'Not Found',
@@ -128,7 +122,13 @@ router.get('/:id', [
       };
 
       res.json({ development_plan: plan });
-    });
+    } catch (err) {
+      console.error('Database error:', err);
+      return res.status(500).json({
+        error: 'Database Error',
+        message: 'Failed to fetch development plan'
+      });
+    }
 
   } catch (error) {
     console.error('Get development plan error:', error);
