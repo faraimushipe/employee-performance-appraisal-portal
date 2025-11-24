@@ -10,7 +10,7 @@ router.get('/', [
   authenticateToken,
   departmentScope,
   checkPermission('reviews', 'read')
-], (req, res) => {
+], async (req, res) => {
   try {
     let sql = `
       SELECT 
@@ -44,15 +44,9 @@ router.get('/', [
 
     sql += ' ORDER BY pr.created_at DESC';
 
-    db.all(sql, params, (err, rows) => {
-      if (err) {
-        console.error('Database error:', err);
-        return res.status(500).json({
-          error: 'Database Error',
-          message: 'Failed to fetch performance reviews'
-        });
-      }
-
+    try {
+      const rows = await db.all(sql, params);
+      
       // Parse JSON fields
       const reviews = rows.map(row => ({
         ...row,
@@ -65,7 +59,13 @@ router.get('/', [
         reviews,
         count: reviews.length
       });
-    });
+    } catch (err) {
+      console.error('Database error:', err);
+      return res.status(500).json({
+        error: 'Database Error',
+        message: 'Failed to fetch performance reviews'
+      });
+    }
 
   } catch (error) {
     console.error('Get reviews error:', error);
@@ -171,19 +171,10 @@ router.post('/', [
     const { employee_id, review_period, goals_set, ratings, competencies, comments } = req.body;
 
     // Check if employee exists and is in the same department (for supervisors)
-    const employee = await new Promise((resolve, reject) => {
-      db.get(
-        'SELECT * FROM Users WHERE id = ? AND is_active = 1',
-        [employee_id],
-        (err, row) => {
-          if (err) {
-            reject(err);
-          } else {
-            resolve(row);
-          }
-        }
-      );
-    });
+    const employee = await db.get(
+      'SELECT * FROM Users WHERE id = ? AND is_active = 1',
+      [employee_id]
+    );
 
     if (!employee) {
       return res.status(404).json({
@@ -205,19 +196,10 @@ router.post('/', [
     
     // If HR_Manager is creating review for someone else, they can assign a different reviewer
     if (req.user.role === 'HR_Manager' && req.body.reviewer_id) {
-      const reviewer = await new Promise((resolve, reject) => {
-        db.get(
-          'SELECT * FROM Users WHERE id = ? AND is_active = 1',
-          [req.body.reviewer_id],
-          (err, row) => {
-            if (err) {
-              reject(err);
-            } else {
-              resolve(row);
-            }
-          }
-        );
-      });
+      const reviewer = await db.get(
+        'SELECT * FROM Users WHERE id = ? AND is_active = 1',
+        [req.body.reviewer_id]
+      );
 
       if (!reviewer) {
         return res.status(404).json({
@@ -230,33 +212,24 @@ router.post('/', [
     }
 
     // Create review
-    const result = await new Promise((resolve, reject) => {
-      db.run(
-        `INSERT INTO PerformanceReviews (employee_id, reviewer_id, review_period, goals_set, ratings, competencies, comments, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          employee_id,
-          reviewer_id,
-          review_period,
-          JSON.stringify(goals_set),
-          JSON.stringify(ratings),
-          JSON.stringify(competencies),
-          comments || null,
-          'draft'
-        ],
-        function(err) {
-          if (err) {
-            reject(err);
-          } else {
-            resolve({ id: this.lastID });
-          }
-        }
-      );
-    });
+    const result = await db.run(
+      `INSERT INTO PerformanceReviews (employee_id, reviewer_id, review_period, goals_set, ratings, competencies, comments, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        employee_id,
+        reviewer_id,
+        review_period,
+        JSON.stringify(goals_set),
+        JSON.stringify(ratings),
+        JSON.stringify(competencies),
+        comments,
+        'draft'
+      ]
+    );
 
     res.status(201).json({
       message: 'Performance review created successfully',
-      review_id: result.id
+      review_id: result.lastID
     });
 
   } catch (error) {
@@ -291,7 +264,7 @@ router.put('/:id', [
     const { goals_set, ratings, competencies, comments, status } = req.body;
 
     // Get current review
-    const currentReview = await new Promise((resolve, reject) => {
+    const currentReview = await db((resolve, reject) => {
       db.get(
         `SELECT pr.*, e.department as employee_department
          FROM PerformanceReviews pr
@@ -367,7 +340,7 @@ router.put('/:id', [
 
     const sql = `UPDATE PerformanceReviews SET ${updates.join(', ')} WHERE id = ?`;
     
-    await new Promise((resolve, reject) => {
+    await db((resolve, reject) => {
       db.run(sql, values, function(err) {
         if (err) {
           reject(err);
@@ -399,7 +372,7 @@ router.post('/:id/submit', [
     const reviewId = req.params.id;
 
     // Get current review
-    const currentReview = await new Promise((resolve, reject) => {
+    const currentReview = await db((resolve, reject) => {
       db.get(
         `SELECT pr.*, e.department as employee_department
          FROM PerformanceReviews pr
@@ -439,7 +412,7 @@ router.post('/:id/submit', [
     }
 
     // Update status to submitted
-    await new Promise((resolve, reject) => {
+    await db((resolve, reject) => {
       db.run(
         'UPDATE PerformanceReviews SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
         ['submitted', reviewId],
@@ -476,7 +449,7 @@ router.post('/:id/approve', [
     const reviewId = req.params.id;
 
     // Get current review
-    const currentReview = await new Promise((resolve, reject) => {
+    const currentReview = await db((resolve, reject) => {
       db.get(
         `SELECT pr.*, e.department as employee_department
          FROM PerformanceReviews pr
@@ -509,7 +482,7 @@ router.post('/:id/approve', [
     }
 
     // Update status to approved
-    await new Promise((resolve, reject) => {
+    await db((resolve, reject) => {
       db.run(
         'UPDATE PerformanceReviews SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
         ['approved', reviewId],
@@ -540,14 +513,14 @@ router.post('/:id/approve', [
 router.get('/stats/overview', [
   authenticateToken,
   checkPermission('reviews', 'read')
-], (req, res) => {
+], async (req, res) => {
   try {
     let sql = `
       SELECT 
         pr.status,
         COUNT(*) as count,
         e.department,
-        AVG(CAST(json_extract(pr.ratings, '$.overall') AS REAL)) as avg_overall_rating
+        AVG(CAST((pr.ratings->>'overall') AS REAL)) as avg_overall_rating
       FROM PerformanceReviews pr
       JOIN Users e ON pr.employee_id = e.id
       WHERE 1=1

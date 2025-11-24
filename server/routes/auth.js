@@ -210,19 +210,10 @@ router.put('/profile', [
     }
     if (email) {
       // Check if email is already taken by another user
-      const existingUser = await new Promise((resolve, reject) => {
-        db.get(
+      const existingUser = await db.get(
           'SELECT id FROM Users WHERE email = ? AND id != ?',
-          [email, req.user.id],
-          (err, row) => {
-            if (err) {
-              reject(err);
-            } else {
-              resolve(row);
-            }
-          }
+          [email, req.user.id]
         );
-      });
 
       if (existingUser) {
         return res.status(409).json({
@@ -247,15 +238,7 @@ router.put('/profile', [
 
     const sql = `UPDATE Users SET ${updates.join(', ')} WHERE id = ?`;
     
-    await new Promise((resolve, reject) => {
-      db.run(sql, values, function(err) {
-        if (err) {
-          reject(err);
-        } else {
-          resolve();
-        }
-      });
-    });
+    await db.run(sql, values);
 
     res.json({
       message: 'Profile updated successfully'
@@ -288,19 +271,10 @@ router.put('/change-password', [
     const { current_password, new_password } = req.body;
 
     // Get current user with password
-    const user = await new Promise((resolve, reject) => {
-      db.get(
+    const user = await db.get(
         'SELECT password_hash FROM Users WHERE id = ?',
-        [req.user.id],
-        (err, row) => {
-          if (err) {
-            reject(err);
-          } else {
-            resolve(row);
-          }
-        }
+        [req.user.id]
       );
-    });
 
     if (!user) {
       return res.status(404).json({
@@ -322,19 +296,10 @@ router.put('/change-password', [
     const hashedNewPassword = await bcrypt.hash(new_password, 10);
 
     // Update password
-    await new Promise((resolve, reject) => {
-      db.run(
+    await db.run(
         'UPDATE Users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-        [hashedNewPassword, req.user.id],
-        function(err) {
-          if (err) {
-            reject(err);
-          } else {
-            resolve();
-          }
-        }
+        [hashedNewPassword, req.user.id]
       );
-    });
 
     res.json({
       message: 'Password changed successfully'

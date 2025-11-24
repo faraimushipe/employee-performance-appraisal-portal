@@ -72,10 +72,10 @@ router.get('/comprehensive', [
       SELECT 
         e.department,
         COUNT(pr.id) as total_reviews,
-        AVG(CAST(json_extract(pr.ratings, '$.overall') AS REAL)) as avg_overall_rating,
-        AVG(CAST(json_extract(pr.ratings, '$.technical') AS REAL)) as avg_technical_rating,
-        AVG(CAST(json_extract(pr.ratings, '$.communication') AS REAL)) as avg_communication_rating,
-        AVG(CAST(json_extract(pr.ratings, '$.leadership') AS REAL)) as avg_leadership_rating
+        AVG(CAST((pr.ratings->>'overall') AS REAL)) as avg_overall_rating,
+        AVG(CAST((pr.ratings->>'technical') AS REAL)) as avg_technical_rating,
+        AVG(CAST((pr.ratings->>'communication') AS REAL)) as avg_communication_rating,
+        AVG(CAST((pr.ratings->>'leadership') AS REAL)) as avg_leadership_rating
       FROM PerformanceReviews pr
       JOIN Users e ON pr.employee_id = e.id
       WHERE pr.status = 'approved'
@@ -102,14 +102,14 @@ router.get('/comprehensive', [
         
         // Get individual ratings for t-test
         const dept1Ratings = await db.all(`
-          SELECT CAST(json_extract(pr.ratings, '$.overall') AS REAL) as rating
+          SELECT CAST((pr.ratings->>'overall') AS REAL) as rating
           FROM PerformanceReviews pr
           JOIN Users e ON pr.employee_id = e.id
           WHERE e.department = ? AND pr.status = 'approved'
         `, [dept1]).then(rows => rows.map(row => row.rating));
 
         const dept2Ratings = await db.all(`
-          SELECT CAST(json_extract(pr.ratings, '$.overall') AS REAL) as rating
+          SELECT CAST((pr.ratings->>'overall') AS REAL) as rating
           FROM PerformanceReviews pr
           JOIN Users e ON pr.employee_id = e.id
           WHERE e.department = ? AND pr.status = 'approved'
@@ -127,7 +127,7 @@ router.get('/comprehensive', [
       SELECT 
         strftime('%Y-%m', pr.created_at) as month,
         COUNT(pr.id) as reviews_count,
-        AVG(CAST(json_extract(pr.ratings, '$.overall') AS REAL)) as avg_rating
+        AVG(CAST((pr.ratings->>'overall') AS REAL)) as avg_rating
       FROM PerformanceReviews pr
       WHERE pr.status = 'approved'
       GROUP BY strftime('%Y-%m', pr.created_at)
@@ -201,7 +201,7 @@ router.get('/department', [
         e.last_name,
         e.role,
         COUNT(pr.id) as total_reviews,
-        AVG(CAST(json_extract(pr.ratings, '$.overall') AS REAL)) as avg_overall_rating,
+        AVG(CAST((pr.ratings->>'overall') AS REAL)) as avg_overall_rating,
         MAX(pr.created_at) as last_review_date
       FROM Users e
       LEFT JOIN PerformanceReviews pr ON e.id = pr.employee_id AND pr.status = 'approved'
@@ -213,10 +213,10 @@ router.get('/department', [
     // Competency gaps analysis
     const competencyGaps = await db.all(`
       SELECT 
-        json_extract(pr.competencies, '$.technical') as technical,
-        json_extract(pr.competencies, '$.communication') as communication,
-        json_extract(pr.competencies, '$.leadership') as leadership,
-        json_extract(pr.competencies, '$.problem_solving') as problem_solving
+        (pr.competencies->>'technical') as technical,
+        (pr.competencies->>'communication') as communication,
+        (pr.competencies->>'leadership') as leadership,
+        (pr.competencies->>'problem_solving') as problem_solving
       FROM PerformanceReviews pr
       JOIN Users e ON pr.employee_id = e.id
       WHERE e.department = ? AND pr.status = 'approved'
@@ -254,12 +254,12 @@ router.get('/department', [
     // Development plan completion rates
     const developmentStats = await db.all(`
       SELECT 
-        dp.completion_status,
+        dp.status,
         COUNT(*) as count
       FROM DevelopmentPlans dp
       JOIN Users e ON dp.employee_id = e.id
       WHERE e.department = ?
-      GROUP BY dp.completion_status
+      GROUP BY dp.status
     `, [department]);
 
     // Resource allocation recommendations
@@ -315,10 +315,10 @@ router.get('/personal', [
       SELECT 
         pr.review_period,
         pr.created_at,
-        CAST(json_extract(pr.ratings, '$.overall') AS REAL) as overall_rating,
-        CAST(json_extract(pr.ratings, '$.technical') AS REAL) as technical_rating,
-        CAST(json_extract(pr.ratings, '$.communication') AS REAL) as communication_rating,
-        CAST(json_extract(pr.ratings, '$.leadership') AS REAL) as leadership_rating
+        CAST((pr.ratings->>'overall') AS REAL) as overall_rating,
+        CAST((pr.ratings->>'technical') AS REAL) as technical_rating,
+        CAST((pr.ratings->>'communication') AS REAL) as communication_rating,
+        CAST((pr.ratings->>'leadership') AS REAL) as leadership_rating
       FROM PerformanceReviews pr
       WHERE pr.employee_id = ? AND pr.status = 'approved'
       ORDER BY pr.created_at ASC
@@ -331,7 +331,7 @@ router.get('/personal', [
         dp.skill_name,
         dp.current_level,
         dp.target_level,
-        dp.completion_status,
+        dp.status,
         dp.impact_rating,
         dp.created_at,
         dp.updated_at
@@ -344,7 +344,7 @@ router.get('/personal', [
     const goalAchievement = await db.all(`
       SELECT 
         pr.review_period,
-        json_extract(pr.goals_set, '$') as goals,
+        pr.goals_set,
         pr.status
       FROM PerformanceReviews pr
       WHERE pr.employee_id = ?
@@ -360,14 +360,14 @@ router.get('/personal', [
       rating_trend: performanceTrends.length > 1 ? 
         performanceTrends[performanceTrends.length - 1].overall_rating - performanceTrends[0].overall_rating : 0,
       development_plans: developmentProgress.length,
-      completed_plans: developmentProgress.filter(dp => dp.completion_status === 'completed').length,
-      in_progress_plans: developmentProgress.filter(dp => dp.completion_status === 'in_progress').length
+      completed_plans: developmentProgress.filter(dp => dp.status === 'completed').length,
+      in_progress_plans: developmentProgress.filter(dp => dp.status === 'active').length
     };
 
     // Anonymized peer comparison (department average)
     const peerComparison = await db.get(`
       SELECT 
-        AVG(CAST(json_extract(pr.ratings, '$.overall') AS REAL)) as dept_avg_rating,
+        AVG(CAST((pr.ratings->>'overall') AS REAL)) as dept_avg_rating,
         COUNT(pr.id) as dept_total_reviews
       FROM PerformanceReviews pr
       JOIN Users e ON pr.employee_id = e.id

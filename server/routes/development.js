@@ -10,7 +10,7 @@ router.get('/', [
   authenticateToken,
   departmentScope,
   checkPermission('development', 'read')
-], (req, res) => {
+], async (req, res) => {
   try {
     let sql = `
       SELECT 
@@ -41,15 +41,9 @@ router.get('/', [
 
     sql += ' ORDER BY dp.created_at DESC';
 
-    db.all(sql, params, (err, rows) => {
-      if (err) {
-        console.error('Database error:', err);
-        return res.status(500).json({
-          error: 'Database Error',
-          message: 'Failed to fetch development plans'
-        });
-      }
-
+    try {
+      const rows = await db.all(sql, params);
+      
       // Parse JSON fields
       const plans = rows.map(row => ({
         ...row,
@@ -60,7 +54,13 @@ router.get('/', [
         development_plans: plans,
         count: plans.length
       });
-    });
+    } catch (err) {
+      console.error('Database error:', err);
+      return res.status(500).json({
+        error: 'Database Error',
+        message: 'Failed to fetch development plans'
+      });
+    }
 
   } catch (error) {
     console.error('Get development plans error:', error);
@@ -164,19 +164,10 @@ router.post('/', [
     const { employee_id, skill_category, skill_name, current_level, target_level, review_id } = req.body;
 
     // Check if employee exists and is in the same department (for supervisors)
-    const employee = await new Promise((resolve, reject) => {
-      db.get(
-        'SELECT * FROM Users WHERE id = ? AND is_active = 1',
-        [employee_id],
-        (err, row) => {
-          if (err) {
-            reject(err);
-          } else {
-            resolve(row);
-          }
-        }
-      );
-    });
+    const employee = await db.get(
+      'SELECT * FROM Users WHERE id = ? AND is_active = 1',
+      [employee_id]
+    );
 
     if (!employee) {
       return res.status(404).json({
@@ -195,19 +186,10 @@ router.post('/', [
 
     // Check if review exists (if provided)
     if (review_id) {
-      const review = await new Promise((resolve, reject) => {
-        db.get(
-          'SELECT * FROM PerformanceReviews WHERE id = ? AND employee_id = ?',
-          [review_id, employee_id],
-          (err, row) => {
-            if (err) {
-              reject(err);
-            } else {
-              resolve(row);
-            }
-          }
-        );
-      });
+      const review = await db.get(
+        'SELECT * FROM PerformanceReviews WHERE id = ? AND employee_id = ?',
+        [review_id, employee_id]
+      );
 
       if (!review) {
         return res.status(404).json({
@@ -226,24 +208,15 @@ router.post('/', [
     }
 
     // Create development plan
-    const result = await new Promise((resolve, reject) => {
-      db.run(
-        `INSERT INTO DevelopmentPlans (employee_id, review_id, skill_category, skill_name, current_level, target_level, completion_status)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [employee_id, review_id || null, skill_category, skill_name, current_level, target_level, 'not_started'],
-        function(err) {
-          if (err) {
-            reject(err);
-          } else {
-            resolve({ id: this.lastID });
-          }
-        }
-      );
-    });
+    const result = await db.run(
+      `INSERT INTO DevelopmentPlans (employee_id, review_id, skill_category, skill_name, current_level, target_level, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [employee_id, review_id || null, skill_category, skill_name, current_level, target_level, 'active']
+    );
 
     res.status(201).json({
       message: 'Development plan created successfully',
-      plan_id: result.id
+      plan_id: result.lastID
     });
 
   } catch (error) {
@@ -265,7 +238,7 @@ router.put('/:id', [
   body('target_level').optional().isInt({ min: 1, max: 5 }),
   body('progress_updates').optional().isArray(),
   body('impact_rating').optional().isInt({ min: 1, max: 5 }),
-  body('completion_status').optional().isIn(['not_started', 'in_progress', 'completed', 'cancelled'])
+  body('status').optional().isIn(['active', 'completed', 'paused'])
 ], auditLog('update', 'development_plan'), async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -277,25 +250,16 @@ router.put('/:id', [
     }
 
     const planId = req.params.id;
-    const { skill_category, skill_name, current_level, target_level, progress_updates, impact_rating, completion_status } = req.body;
+    const { skill_category, skill_name, current_level, target_level, progress_updates, impact_rating, status } = req.body;
 
     // Get current plan
-    const currentPlan = await new Promise((resolve, reject) => {
-      db.get(
-        `SELECT dp.*, e.department as employee_department
-         FROM DevelopmentPlans dp
-         JOIN Users e ON dp.employee_id = e.id
-         WHERE dp.id = ?`,
-        [planId],
-        (err, row) => {
-          if (err) {
-            reject(err);
-          } else {
-            resolve(row);
-          }
-        }
-      );
-    });
+    const currentPlan = await db.get(
+      `SELECT dp.*, e.department as employee_department
+       FROM DevelopmentPlans dp
+       JOIN Users e ON dp.employee_id = e.id
+       WHERE dp.id = ?`,
+      [planId]
+    );
 
     if (!currentPlan) {
       return res.status(404).json({
@@ -347,9 +311,9 @@ router.put('/:id', [
       updates.push('impact_rating = ?');
       values.push(impact_rating);
     }
-    if (completion_status) {
-      updates.push('completion_status = ?');
-      values.push(completion_status);
+    if (status) {
+      updates.push('status = ?');
+      values.push(status);
     }
 
     if (updates.length === 0) {
@@ -364,15 +328,7 @@ router.put('/:id', [
 
     const sql = `UPDATE DevelopmentPlans SET ${updates.join(', ')} WHERE id = ?`;
     
-    await new Promise((resolve, reject) => {
-      db.run(sql, values, function(err) {
-        if (err) {
-          reject(err);
-        } else {
-          resolve();
-        }
-      });
-    });
+    await db.run(sql, values);
 
     res.json({
       message: 'Development plan updated successfully'
@@ -407,22 +363,13 @@ router.post('/:id/progress', [
     const { update_text, progress_percentage } = req.body;
 
     // Get current plan
-    const currentPlan = await new Promise((resolve, reject) => {
-      db.get(
-        `SELECT dp.*, e.department as employee_department
-         FROM DevelopmentPlans dp
-         JOIN Users e ON dp.employee_id = e.id
-         WHERE dp.id = ?`,
-        [planId],
-        (err, row) => {
-          if (err) {
-            reject(err);
-          } else {
-            resolve(row);
-          }
-        }
-      );
-    });
+    const currentPlan = await db.get(
+      `SELECT dp.*, e.department as employee_department
+       FROM DevelopmentPlans dp
+       JOIN Users e ON dp.employee_id = e.id
+       WHERE dp.id = ?`,
+      [planId]
+    );
 
     if (!currentPlan) {
       return res.status(404).json({
@@ -461,19 +408,10 @@ router.post('/:id/progress', [
     existingUpdates.push(newUpdate);
 
     // Update the plan
-    await new Promise((resolve, reject) => {
-      db.run(
-        'UPDATE DevelopmentPlans SET progress_updates = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-        [JSON.stringify(existingUpdates), planId],
-        function(err) {
-          if (err) {
-            reject(err);
-          } else {
-            resolve();
-          }
-        }
-      );
-    });
+    await db.run(
+      'UPDATE DevelopmentPlans SET progress_updates = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [JSON.stringify(existingUpdates), planId]
+    );
 
     res.json({
       message: 'Progress update added successfully',
@@ -508,22 +446,13 @@ router.post('/:id/complete', [
     const { impact_rating } = req.body;
 
     // Get current plan
-    const currentPlan = await new Promise((resolve, reject) => {
-      db.get(
-        `SELECT dp.*, e.department as employee_department
-         FROM DevelopmentPlans dp
-         JOIN Users e ON dp.employee_id = e.id
-         WHERE dp.id = ?`,
-        [planId],
-        (err, row) => {
-          if (err) {
-            reject(err);
-          } else {
-            resolve(row);
-          }
-        }
-      );
-    });
+    const currentPlan = await db.get(
+      `SELECT dp.*, e.department as employee_department
+       FROM DevelopmentPlans dp
+       JOIN Users e ON dp.employee_id = e.id
+       WHERE dp.id = ?`,
+      [planId]
+    );
 
     if (!currentPlan) {
       return res.status(404).json({
@@ -548,19 +477,10 @@ router.post('/:id/complete', [
     }
 
     // Update plan to completed
-    await new Promise((resolve, reject) => {
-      db.run(
-        'UPDATE DevelopmentPlans SET completion_status = ?, impact_rating = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-        ['completed', impact_rating, planId],
-        function(err) {
-          if (err) {
-            reject(err);
-          } else {
-            resolve();
-          }
-        }
-      );
-    });
+    await db.run(
+      'UPDATE DevelopmentPlans SET status = ?, impact_rating = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      ['completed', impact_rating, planId]
+    );
 
     res.json({
       message: 'Development plan completed successfully'
@@ -579,11 +499,11 @@ router.post('/:id/complete', [
 router.get('/stats/overview', [
   authenticateToken,
   checkPermission('development', 'read')
-], (req, res) => {
+], async (req, res) => {
   try {
     let sql = `
       SELECT 
-        dp.completion_status,
+        dp.status,
         COUNT(*) as count,
         e.department,
         AVG(dp.impact_rating) as avg_impact_rating
@@ -599,21 +519,21 @@ router.get('/stats/overview', [
       params.push(req.departmentScope);
     }
 
-    sql += ' GROUP BY dp.completion_status, e.department ORDER BY e.department, dp.completion_status';
+    sql += ' GROUP BY dp.status, e.department ORDER BY e.department, dp.status';
 
-    db.all(sql, params, (err, rows) => {
-      if (err) {
-        console.error('Database error:', err);
-        return res.status(500).json({
-          error: 'Database Error',
-          message: 'Failed to fetch development plan statistics'
-        });
-      }
-
+    try {
+      const rows = await db.all(sql, params);
+      
       res.json({
         development_stats: rows
       });
-    });
+    } catch (err) {
+      console.error('Database error:', err);
+      return res.status(500).json({
+        error: 'Database Error',
+        message: 'Failed to fetch development plan statistics'
+      });
+    }
 
   } catch (error) {
     console.error('Get development stats error:', error);

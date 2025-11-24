@@ -70,7 +70,7 @@ const SURVEY_TEMPLATES = {
 router.get('/available', [
   authenticateToken,
   checkPermission('surveys', 'read')
-], (req, res) => {
+], async (req, res) => {
   try {
     const userRole = req.user.role;
     let availableSurveys = [];
@@ -182,19 +182,10 @@ router.post('/submit', [
     }
 
     // Check if user has already submitted this survey type
-    const existingResponse = await new Promise((resolve, reject) => {
-      db.get(
-        'SELECT id FROM SurveyResponses WHERE user_id = ? AND survey_type = ?',
-        [userId, survey_type],
-        (err, row) => {
-          if (err) {
-            reject(err);
-          } else {
-            resolve(row);
-          }
-        }
-      );
-    });
+    const existingResponse = await db.get(
+      'SELECT id FROM SurveyResponses WHERE user_id = ? AND survey_type = ?',
+      [userId, survey_type]
+    );
 
     if (existingResponse) {
       return res.status(409).json({
@@ -204,20 +195,11 @@ router.post('/submit', [
     }
 
     // Create survey response
-    const result = await new Promise((resolve, reject) => {
-      db.run(
-        `INSERT INTO SurveyResponses (user_id, survey_type, response_data, role, department)
-         VALUES (?, ?, ?, ?, ?)`,
-        [userId, survey_type, JSON.stringify(response_data), userRole, department],
-        function(err) {
-          if (err) {
-            reject(err);
-          } else {
-            resolve({ id: this.lastID });
-          }
-        }
-      );
-    });
+    const result = await db.run(
+      `INSERT INTO SurveyResponses (user_id, survey_type, response_data, role, department)
+       VALUES (?, ?, ?, ?, ?)`,
+      [userId, survey_type, JSON.stringify(response_data), userRole, department]
+    );
 
     res.status(201).json({
       message: 'Survey response submitted successfully',

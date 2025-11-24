@@ -103,29 +103,13 @@ router.post('/', [
       VALUES (?, ?, ?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
     `;
 
-    const result = await new Promise((resolve, reject) => {
-      db.run(sql, [first_name, last_name, email, hashedPassword, department, role, employment_date], function(err) {
-        if (err) {
-          reject(err);
-        } else {
-          resolve({ id: this.lastID });
-        }
-      });
-    });
+    const result = await db.run(sql, [first_name, last_name, email, hashedPassword, department, role, employment_date]);
 
     // Get the created user (without password)
-    const newUser = await new Promise((resolve, reject) => {
-      db.get(`
-        SELECT id, email, first_name, last_name, department, role, employment_date, is_active, created_at
-        FROM Users WHERE id = ?
-      `, [result.id], (err, row) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(row);
-        }
-      });
-    });
+    const newUser = await db.get(`
+      SELECT id, email, first_name, last_name, department, role, employment_date, is_active, created_at
+      FROM Users WHERE id = ?
+    `, [result.id]);
 
     res.status(201).json({
       message: 'User created successfully',
@@ -167,19 +151,10 @@ router.post('/:id/reset-password', [
     const hashedPassword = await bcrypt.hash(tempPassword, 10);
 
     // Update user password
-    await new Promise((resolve, reject) => {
-      db.run(
-        'UPDATE Users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-        [hashedPassword, userId],
-        function(err) {
-          if (err) {
-            reject(err);
-          } else {
-            resolve();
-          }
-        }
-      );
-    });
+    await db.run(
+      'UPDATE Users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [hashedPassword, userId]
+    );
 
     res.json({
       message: 'Password reset successfully',
@@ -324,19 +299,10 @@ router.put('/:id', [
     }
     if (email) {
       // Check if email is already taken by another user
-      const existingUser = await new Promise((resolve, reject) => {
-        db.get(
-          'SELECT id FROM Users WHERE email = ? AND id != ?',
-          [email, userId],
-          (err, row) => {
-            if (err) {
-              reject(err);
-            } else {
-              resolve(row);
-            }
-          }
-        );
-      });
+      const existingUser = await db.get(
+        'SELECT id FROM Users WHERE email = ? AND id != ?',
+        [email, userId]
+      );
 
       if (existingUser) {
         return res.status(409).json({
@@ -373,15 +339,7 @@ router.put('/:id', [
 
     const sql = `UPDATE Users SET ${updates.join(', ')} WHERE id = ?`;
     
-    await new Promise((resolve, reject) => {
-      db.run(sql, values, function(err) {
-        if (err) {
-          reject(err);
-        } else {
-          resolve();
-        }
-      });
-    });
+    await db.run(sql, values);
 
     res.json({
       message: 'User updated successfully'
