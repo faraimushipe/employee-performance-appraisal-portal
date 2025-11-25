@@ -43,36 +43,49 @@ const db = {
   },
   all: (sql, params) => {
     console.log('PostgreSQL Query (all):', sql, params);
-    // Convert SQLite ? parameters to PostgreSQL $1, $2, etc.
+    // If params is undefined, use empty array
+    const safeParams = Array.isArray(params) ? [...params] : [];
     let pgSql = sql;
-    let pgParams = params ? [...params] : [];
     
-    if (params && params.length > 0) {
+    // Convert SQLite ? parameters to PostgreSQL $1, $2, etc.
+    if (safeParams.length > 0) {
       let paramIndex = 1;
-      pgSql = sql.replace(/\?/g, () => `$${paramIndex++}`);
+      pgSql = sql.replace(/\?/g, (match, offset) => {
+        // Skip replacing if it's part of a JSON operator (->> or ->)
+        if (offset > 0 && (sql[offset - 1] === '>' && (offset === 1 || sql[offset - 2] === '-'))) {
+          return match;
+        }
+        return `$${paramIndex++}`;
+      });
       
-      // Fix boolean comparisons (SQLite uses 1/0, PostgreSQL uses true/false)
+      // Convert boolean parameters (SQLite uses 1/0, PostgreSQL uses true/false)
+      const pgParams = safeParams.map(param => {
+        if (param === 1 || param === '1') return true;
+        if (param === 0 || param === '0') return false;
+        return param;
+      });
+      
+      // Fix boolean comparisons in the SQL (SQLite uses 1/0, PostgreSQL uses true/false)
       pgSql = pgSql.replace(/= 1(?!\d)/g, '= true');
       pgSql = pgSql.replace(/= 0(?!\d)/g, '= false');
       
-      // Convert boolean parameters (SQLite uses 1/0, PostgreSQL uses true/false)
-      pgParams = pgParams.map(param => {
-        if (param === 1) return true;
-        if (param === 0) return false;
-        return param;
-      });
-    }
-    console.log('Converted PostgreSQL Query:', pgSql, pgParams);
-    return new Promise((resolve, reject) => {
-      pool.query(pgSql, pgParams)
-        .then(result => {
-          resolve(result.rows);
-        })
+      console.log('Converted PostgreSQL Query (all):', pgSql, pgParams);
+      return pool.query(pgSql, pgParams)
+        .then(result => result.rows)
         .catch(err => {
           console.error('PostgreSQL Error (all):', err);
-          reject(err);
+          throw err;
         });
-    });
+    }
+    
+    // If no parameters, execute directly
+    console.log('Converted PostgreSQL Query (all):', pgSql, '[]');
+    return pool.query(pgSql)
+      .then(result => result.rows)
+      .catch(err => {
+        console.error('PostgreSQL Error (all):', err);
+        throw err;
+      });
   },
   run: (sql, params) => {
     console.log('PostgreSQL Query (run):', sql, params);
@@ -90,22 +103,22 @@ const db = {
       
       // Convert boolean parameters (SQLite uses 1/0, PostgreSQL uses true/false)
       pgParams = pgParams.map(param => {
-        if (param === 1) return true;
-        if (param === 0) return false;
+        if (param === 1 || param === '1') return true;
+        if (param === 0 || param === '0') return false;
         return param;
       });
     }
-    console.log('Converted PostgreSQL Query:', pgSql, pgParams);
-    return new Promise((resolve, reject) => {
-      pool.query(pgSql, pgParams)
-        .then(result => {
-          resolve({ lastID: result.insertId, changes: result.rowCount });
-        })
-        .catch(err => {
-          console.error('PostgreSQL Error (run):', err);
-          reject(err);
-        });
-    });
+    
+    console.log('Converted PostgreSQL Query (run):', pgSql, pgParams);
+    return pool.query(pgSql, pgParams)
+      .then(result => ({
+        lastID: result.rows[0]?.id || 0,
+        changes: result.rowCount
+      }))
+      .catch(err => {
+        console.error('PostgreSQL Error (run):', err);
+        throw err;
+      });
   }
 };
 

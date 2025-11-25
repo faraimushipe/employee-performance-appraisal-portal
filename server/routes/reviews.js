@@ -170,16 +170,16 @@ router.post('/', [
 
     const { employee_id, review_period, goals_set, ratings, competencies, comments } = req.body;
 
-    // Check if employee exists and is in the same department (for supervisors)
+    // Check if employee exists and is active
     const employee = await db.get(
-      'SELECT * FROM Users WHERE id = ? AND is_active = 1',
+      'SELECT * FROM "Users" WHERE id = $1 AND is_active = true',
       [employee_id]
     );
 
     if (!employee) {
       return res.status(404).json({
         error: 'Not Found',
-        message: 'Employee not found'
+        message: 'Employee not found or inactive'
       });
     }
 
@@ -191,45 +191,62 @@ router.post('/', [
       });
     }
 
-    // Determine reviewer
     let reviewer_id = req.user.id;
     
     // If HR_Manager is creating review for someone else, they can assign a different reviewer
     if (req.user.role === 'HR_Manager' && req.body.reviewer_id) {
       const reviewer = await db.get(
-        'SELECT * FROM Users WHERE id = ? AND is_active = 1',
+        'SELECT * FROM "Users" WHERE id = $1 AND is_active = true',
         [req.body.reviewer_id]
       );
 
       if (!reviewer) {
         return res.status(404).json({
           error: 'Not Found',
-          message: 'Reviewer not found'
+          message: 'Reviewer not found or inactive'
         });
       }
-
       reviewer_id = req.body.reviewer_id;
     }
 
-    // Create review
-    const result = await db.run(
-      `INSERT INTO PerformanceReviews (employee_id, reviewer_id, review_period, goals_set, ratings, competencies, comments, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        employee_id,
-        reviewer_id,
-        review_period,
-        JSON.stringify(goals_set),
-        JSON.stringify(ratings),
-        JSON.stringify(competencies),
+    // Calculate overall score if ratings are provided
+    let overall_score = null;
+    if (ratings && typeof ratings === 'object') {
+      const ratingValues = Object.values(ratings).filter(v => typeof v === 'number');
+      if (ratingValues.length > 0) {
+        overall_score = ratingValues.reduce((a, b) => a + b, 0) / ratingValues.length;
+        // Round to 2 decimal places
+        overall_score = Math.round(overall_score * 100) / 100;
+      }
+    }
+
+    // Insert the new review
+    const result = await db.run(`
+      INSERT INTO "PerformanceReviews" (
+        employee_id, 
+        reviewer_id, 
+        review_period, 
+        goals_set, 
+        ratings, 
+        overall_score, 
         comments,
-        'draft'
-      ]
-    );
+        status
+      ) 
+      VALUES ($1, $2, $3, $4, $5, $6, $7, 'draft')
+      RETURNING id
+    `, [
+      employee_id,
+      reviewer_id,
+      review_period,
+      JSON.stringify(goals_set),
+      JSON.stringify(ratings),
+      overall_score,
+      comments || null
+    ]);
 
     res.status(201).json({
       message: 'Performance review created successfully',
-      review_id: result.lastID
+      reviewId: result.id || result.lastID
     });
 
   } catch (error) {
