@@ -220,45 +220,67 @@ router.get('/responses', [
   authenticateToken,
   checkPermission('surveys', 'read')
 ], async (req, res) => {
-  try {
-    const userId = req.user.id;
+  const userId = req.user.id;
+  console.log(`[${new Date().toISOString()}] Fetching survey responses for user ${userId}`);
 
+  try {
+    // Using $1 placeholder for PostgreSQL compatibility
+    // Using database-agnostic query that works with both SQLite and PostgreSQL
     const sql = `
       SELECT 
         id,
         survey_type,
-        responses::text as response_data,
+        responses as response_data,
         submitted_at as created_at
-      FROM SurveyResponses
-      WHERE user_id = ?
+      FROM "SurveyResponses"
+      WHERE user_id = $1
       ORDER BY submitted_at DESC
     `;
 
-    try {
-      const rows = await db.all(sql, [userId]);
-      
-      const responses = rows.map(row => ({
-        ...row,
-        response_data: JSON.parse(row.response_data)
-      }));
+    console.log(`[${new Date().toISOString()}] Executing SQL for user ${userId}`);
+    
+    const rows = await db.all(sql, [userId]);
+    console.log(`[${new Date().toISOString()}] Found ${rows.length} responses for user ${userId}`);
 
-      res.json({
-        responses,
-        count: responses.length
-      });
-    } catch (err) {
-      console.error('Database error:', err);
-      return res.status(500).json({
-        error: 'Database Error',
-        message: 'Failed to fetch survey responses'
-      });
-    }
+    const responses = rows.map(row => {
+      try {
+        return {
+          ...row,
+          response_data: row.response_data ? JSON.parse(row.response_data) : {}
+        };
+      } catch (parseError) {
+        console.error(`Error parsing response data for row ${row.id || 'unknown'}:`, {
+          error: parseError.message,
+          response_data_length: row.response_data ? row.response_data.length : 0,
+          sample: row.response_data ? String(row.response_data).substring(0, 100) + '...' : 'null'
+        });
+        return {
+          ...row,
+          response_data: { error: 'Failed to parse response data' },
+          _parseError: process.env.NODE_ENV === 'development' ? parseError.message : undefined
+        };
+      }
+    });
+
+    res.json({
+      responses,
+      count: responses.length,
+      success: true
+    });
 
   } catch (error) {
-    console.error('Get survey responses error:', error);
+    console.error(`[${new Date().toISOString()}] Failed to fetch survey responses for user ${userId}:`, {
+      error: error.message,
+      stack: error.stack,
+      userId,
+      timestamp: new Date().toISOString()
+    });
+    
     res.status(500).json({
-      error: 'Internal Server Error',
-      message: 'Failed to fetch survey responses'
+      error: 'Database Error',
+      message: 'Failed to fetch survey responses',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      success: false
     });
   }
 });
