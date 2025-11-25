@@ -220,6 +220,9 @@ router.post('/', [
       }
     }
 
+    // Ensure overall_score is properly typed (number or null)
+    const overallScore = overall_score !== null ? parseFloat(overall_score) : null;
+
     // Insert the new review
     const result = await db.run(`
       INSERT INTO "PerformanceReviews" (
@@ -240,7 +243,7 @@ router.post('/', [
       review_period,
       JSON.stringify(goals_set),
       JSON.stringify(ratings),
-      overall_score,
+      overallScore,
       comments || null
     ]);
 
