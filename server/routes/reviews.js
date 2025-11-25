@@ -229,7 +229,7 @@ router.post('/', [
         employee_id, 
         reviewer_id, 
         review_period, 
-        goals_set, 
+        goals, 
         ratings, 
         overall_score, 
         comments,
@@ -241,7 +241,7 @@ router.post('/', [
       employee_id,
       reviewer_id,
       review_period,
-      JSON.stringify(goals_set),
+      JSON.stringify(goals_set), // Keep the variable name as is, just changing the column name
       JSON.stringify(ratings),
       overallScore,
       comments || null
