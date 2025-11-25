@@ -198,17 +198,26 @@ router.post('/', [
 
     const { employee_id, review_period, goals, ratings, competencies, comments } = req.body;
     
-    if (!employee_id || !review_period || !goals || !ratings) {
+    // Convert and validate employee_id
+    const empId = parseInt(employee_id);
+    if (isNaN(empId) || empId <= 0) {
+      return res.status(400).json({
+        error: 'Validation Error',
+        message: 'Valid employee ID is required'
+      });
+    }
+    
+    if (!review_period || !goals || !ratings) {
       return res.status(400).json({
         error: 'Missing required fields',
-        message: 'Employee ID, review period, goals, and ratings are required'
+        message: 'Review period, goals, and ratings are required'
       });
     }
 
     // Check if employee exists and is active
     const employee = await db.get(
       'SELECT * FROM "Users" WHERE id = $1 AND is_active = true',
-      [employee_id]
+      [empId]
     );
 
     if (!employee) {
@@ -230,9 +239,18 @@ router.post('/', [
     
     // If HR_Manager is creating review for someone else, they can assign a different reviewer
     if (req.user.role === 'HR_Manager' && req.body.reviewer_id) {
+      // Convert and validate reviewer_id
+      const revId = parseInt(req.body.reviewer_id);
+      if (isNaN(revId) || revId <= 0) {
+        return res.status(400).json({
+          error: 'Validation Error',
+          message: 'Valid reviewer ID is required'
+        });
+      }
+      
       const reviewer = await db.get(
         'SELECT * FROM "Users" WHERE id = $1 AND is_active = true',
-        [req.body.reviewer_id]
+        [revId]
       );
 
       if (!reviewer) {
@@ -241,7 +259,7 @@ router.post('/', [
           message: 'Reviewer not found or inactive'
         });
       }
-      reviewer_id = req.body.reviewer_id;
+      reviewer_id = revId;
     }
 
     // Calculate overall score if ratings are provided
@@ -274,8 +292,8 @@ router.post('/', [
         VALUES ($1, $2, $3, $4, $5, $6, $7, 'draft')
         RETURNING id
       `, [
-        Number(employee_id),    // Ensure number type
-        Number(reviewer_id),    // Ensure number type
+        empId,                 // Use validated employee ID
+        reviewer_id,           // Use validated reviewer ID
         review_period,
         JSON.stringify(goals || []),
         JSON.stringify(ratings || {}),
