@@ -23,6 +23,7 @@ const db = {
       pgSql = pgSql.replace(/= 0(?!\d)/g, '= false');
       
       // Convert boolean parameters (SQLite uses 1/0, PostgreSQL uses true/false)
+      // Only convert actual numbers, not strings
       pgParams = pgParams.map(param => {
         if (param === 1) return true;
         if (param === 0) return false;
@@ -59,9 +60,10 @@ const db = {
       });
       
       // Convert boolean parameters (SQLite uses 1/0, PostgreSQL uses true/false)
+      // Only convert actual numbers, not strings
       const pgParams = safeParams.map(param => {
-        if (param === 1 || param === '1') return true;
-        if (param === 0 || param === '0') return false;
+        if (param === 1) return true;
+        if (param === 0) return false;
         return param;
       });
       
@@ -102,9 +104,10 @@ const db = {
       pgSql = pgSql.replace(/= 0(?!\d)/g, '= false');
       
       // Convert boolean parameters (SQLite uses 1/0, PostgreSQL uses true/false)
+      // Only convert actual numbers, not strings
       pgParams = pgParams.map(param => {
-        if (param === 1 || param === '1') return true;
-        if (param === 0 || param === '0') return false;
+        if (param === 1) return true;
+        if (param === 0) return false;
         return param;
       });
     }
