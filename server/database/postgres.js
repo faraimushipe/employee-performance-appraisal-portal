@@ -188,19 +188,46 @@ const createDevelopmentPlansTable = async () => {
 
 const createSurveyResponsesTable = async () => {
   try {
+    // First, ensure Users table exists
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS "Users" (
+        id SERIAL PRIMARY KEY,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password_hash VARCHAR(255) NOT NULL,
+        first_name VARCHAR(100),
+        last_name VARCHAR(100),
+        role VARCHAR(50) NOT NULL,
+        department VARCHAR(100),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    
+    // Then create SurveyResponses with foreign key
     const sql = `
       CREATE TABLE IF NOT EXISTS "SurveyResponses" (
         id SERIAL PRIMARY KEY,
-        user_id INTEGER REFERENCES "Users"(id) ON DELETE CASCADE,
+        user_id INTEGER,
         survey_type VARCHAR(50) NOT NULL,
         responses JSONB NOT NULL,
         submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         department VARCHAR(50),
-        role VARCHAR(50)
+        role VARCHAR(50),
+        FOREIGN KEY (user_id) REFERENCES "Users"(id) ON DELETE CASCADE
       )
     `;
+    
     await pool.query(sql);
     console.log('SurveyResponses table created or already exists');
+    
+    // Add any missing columns (for existing tables)
+    try {
+      await pool.query('ALTER TABLE "SurveyResponses" ADD COLUMN IF NOT EXISTS department VARCHAR(50)');
+      await pool.query('ALTER TABLE "SurveyResponses" ADD COLUMN IF NOT EXISTS role VARCHAR(50)');
+    } catch (alterError) {
+      console.log('Columns already exist or could not be added:', alterError.message);
+    }
+    
   } catch (error) {
     console.error('Error creating SurveyResponses table:', error);
     throw error;
