@@ -47,13 +47,31 @@ router.get('/', [
     try {
       const rows = await db.all(sql, params);
       
-      // Parse JSON fields
-      const reviews = rows.map(row => ({
-        ...row,
-        goals_set: JSON.parse(row.goals_set),
-        ratings: JSON.parse(row.ratings),
-        competencies: JSON.parse(row.competencies)
-      }));
+      // Safely parse JSON fields
+      const reviews = rows.map(row => {
+        const parsedRow = { ...row };
+        
+        // Helper function to safely parse JSON
+        const safeJsonParse = (value, defaultValue = null) => {
+          try {
+            return value ? JSON.parse(value) : defaultValue;
+          } catch (e) {
+            console.warn('Failed to parse JSON:', e);
+            return defaultValue;
+          }
+        };
+
+        // Parse each JSON field safely
+        parsedRow.goals = safeJsonParse(row.goals, []);
+        parsedRow.ratings = safeJsonParse(row.ratings, {});
+        
+        // Handle competencies if the column exists
+        if (row.competencies !== undefined) {
+          parsedRow.competencies = safeJsonParse(row.competencies, {});
+        }
+        
+        return parsedRow;
+      });
 
       res.json({
         reviews,
@@ -155,9 +173,9 @@ router.post('/', [
   checkPermission('reviews', 'create'),
   body('employee_id').isInt({ min: 1 }),
   body('review_period').notEmpty().trim(),
-  body('goals_set').isArray({ min: 1 }),
-  body('ratings').isObject(),
-  body('competencies').isObject()
+  body('goals').isArray({ min: 1 }).withMessage('At least one goal is required'),
+  body('ratings').isObject().withMessage('Ratings must be an object'),
+  body('competencies').optional().isObject().withMessage('Competencies must be an object')
 ], auditLog('create', 'review'), async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -168,7 +186,14 @@ router.post('/', [
       });
     }
 
-    const { employee_id, review_period, goals_set, ratings, competencies, comments } = req.body;
+    const { employee_id, review_period, goals, ratings, competencies, comments } = req.body;
+    
+    if (!employee_id || !review_period || !goals || !ratings) {
+      return res.status(400).json({
+        error: 'Missing required fields',
+        message: 'Employee ID, review period, goals, and ratings are required'
+      });
+    }
 
     // Check if employee exists and is active
     const employee = await db.get(
@@ -241,7 +266,7 @@ router.post('/', [
       employee_id,
       reviewer_id,
       review_period,
-      JSON.stringify(goals_set), // Keep the variable name as is, just changing the column name
+      JSON.stringify(goals),
       JSON.stringify(ratings),
       overallScore,
       comments || null
@@ -254,9 +279,15 @@ router.post('/', [
 
   } catch (error) {
     console.error('Create review error:', error);
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      ...(error.response && { response: error.response.data })
+    });
     res.status(500).json({
       error: 'Internal Server Error',
-      message: 'Failed to create performance review'
+      message: 'Failed to create performance review',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
