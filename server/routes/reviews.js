@@ -198,12 +198,25 @@ router.post('/', [
 
     const { employee_id, review_period, goals, ratings, competencies, comments } = req.body;
     
+    // Debug logging to see what we're receiving
+    console.log('Create review request body:', {
+      employee_id,
+      employee_id_type: typeof employee_id,
+      review_period,
+      goals,
+      ratings
+    });
+    
     // Convert and validate employee_id
     const empId = parseInt(employee_id);
+    console.log('Parsed empId:', empId, 'isNaN:', isNaN(empId));
+    
     if (isNaN(empId) || empId <= 0) {
       return res.status(400).json({
         error: 'Validation Error',
-        message: 'Valid employee ID is required'
+        message: 'Valid employee ID is required',
+        received: employee_id,
+        type: typeof employee_id
       });
     }
     
@@ -239,12 +252,19 @@ router.post('/', [
     
     // If HR_Manager is creating review for someone else, they can assign a different reviewer
     if (req.user.role === 'HR_Manager' && req.body.reviewer_id) {
+      // Debug logging
+      console.log('Reviewer ID from body:', req.body.reviewer_id, 'type:', typeof req.body.reviewer_id);
+      
       // Convert and validate reviewer_id
       const revId = parseInt(req.body.reviewer_id);
+      console.log('Parsed revId:', revId, 'isNaN:', isNaN(revId));
+      
       if (isNaN(revId) || revId <= 0) {
         return res.status(400).json({
           error: 'Validation Error',
-          message: 'Valid reviewer ID is required'
+          message: 'Valid reviewer ID is required',
+          received: req.body.reviewer_id,
+          type: typeof req.body.reviewer_id
         });
       }
       
@@ -278,6 +298,19 @@ router.post('/', [
 
     // Insert the new review
     try {
+      // Debug logging before database insert
+      console.log('About to insert review with values:', {
+        empId,
+        empIdType: typeof empId,
+        reviewer_id,
+        reviewer_id_type: typeof reviewer_id,
+        review_period,
+        goals,
+        ratings,
+        overallScore,
+        comments
+      });
+      
       const result = await db.run(`
         INSERT INTO "PerformanceReviews" (
           employee_id, 
