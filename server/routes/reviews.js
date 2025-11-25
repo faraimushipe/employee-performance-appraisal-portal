@@ -3,6 +3,16 @@ const { body, validationResult } = require('express-validator');
 const { db } = require('../database/postgres');
 const { authenticateToken, authorize, departmentScope, checkPermission, auditLog } = require('../middleware/auth');
 
+// Helper function to safely parse JSON
+const safeJsonParse = (value, defaultValue = null) => {
+  try {
+    return value ? JSON.parse(value) : defaultValue;
+  } catch (e) {
+    console.warn('Failed to parse JSON:', e);
+    return defaultValue;
+  }
+};
+
 const router = express.Router();
 
 // Get all performance reviews (with role-based filtering)
@@ -29,16 +39,16 @@ router.get('/', [
 
     // Apply role-based filtering
     if (req.user.role === 'Employee') {
-      sql += ' AND pr.employee_id = ?';
+      sql += ' AND pr.employee_id = $1';
       params.push(req.user.id);
     } else if (req.user.role === 'Department_Supervisor') {
-      sql += ' AND e.department = ?';
+      sql += ' AND e.department = $1';
       params.push(req.user.department);
     }
 
     // Apply department scope filtering
     if (req.departmentScope) {
-      sql += ' AND e.department = ?';
+      sql += ' AND e.department = $' + (params.length + 1);
       params.push(req.departmentScope);
     }
 
@@ -249,44 +259,78 @@ router.post('/', [
     const overallScore = overall_score !== null ? parseFloat(overall_score) : null;
 
     // Insert the new review
-    const result = await db.run(`
-      INSERT INTO "PerformanceReviews" (
-        employee_id, 
-        reviewer_id, 
-        review_period, 
-        goals, 
-        ratings, 
-        overall_score, 
-        comments,
-        status
-      ) 
-      VALUES ($1, $2, $3, $4, $5, $6, $7, 'draft')
-      RETURNING id
-    `, [
-      employee_id,
-      reviewer_id,
-      review_period,
-      JSON.stringify(goals),
-      JSON.stringify(ratings),
-      overallScore,
-      comments || null
-    ]);
+    try {
+      const result = await db.run(`
+        INSERT INTO "PerformanceReviews" (
+          employee_id, 
+          reviewer_id, 
+          review_period, 
+          goals, 
+          ratings, 
+          overall_score, 
+          comments,
+          status
+        ) 
+        VALUES ($1, $2, $3, $4, $5, $6, $7, 'draft')
+        RETURNING id
+      `, [
+        Number(employee_id),    // Ensure number type
+        Number(reviewer_id),    // Ensure number type
+        review_period,
+        JSON.stringify(goals || []),
+        JSON.stringify(ratings || {}),
+        overallScore,
+        comments || null
+      ]);
+      
+      if (!result || !result.id) {
+        throw new Error('Failed to create review: No ID returned from database');
+      }
 
     res.status(201).json({
       message: 'Performance review created successfully',
       reviewId: result.id || result.lastID
     });
 
+    } catch (dbError) {
+      console.error('Database error when creating review:', dbError);
+      return res.status(500).json({
+        error: 'Database Error',
+        message: 'Failed to create performance review',
+        details: process.env.NODE_ENV === 'development' ? dbError.message : undefined
+      });
+    }
+
   } catch (error) {
-    console.error('Create review error:', error);
-    console.error('Error details:', {
+    console.error('Create review error:', {
       message: error.message,
       stack: error.stack,
-      ...(error.response && { response: error.response.data })
+      code: error.code,
+      detail: error.detail,
+      hint: error.hint,
+      position: error.position,
+      internalPosition: error.internalPosition,
+      internalQuery: error.internalQuery,
+      where: error.where,
+      schema: error.schema,
+      table: error.table,
+      column: error.column,
+      dataType: error.dataType,
+      constraint: error.constraint,
+      file: error.file,
+      line: error.line,
+      routine: error.routine
     });
-    res.status(500).json({
-      error: 'Internal Server Error',
-      message: 'Failed to create performance review',
+    
+    let errorMessage = 'Failed to create performance review';
+    if (error.code === '22P02') {
+      errorMessage = 'Invalid data type provided. Please check your input values.';
+    }
+    
+    return res.status(500).json({
+      error: 'Database Error',
+      code: error.code,
+      message: errorMessage,
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
@@ -315,22 +359,13 @@ router.put('/:id', [
     const { goals_set, ratings, competencies, comments, status } = req.body;
 
     // Get current review
-    const currentReview = await db((resolve, reject) => {
-      db.get(
-        `SELECT pr.*, e.department as employee_department
-         FROM PerformanceReviews pr
-         JOIN Users e ON pr.employee_id = e.id
-         WHERE pr.id = ?`,
-        [reviewId],
-        (err, row) => {
-          if (err) {
-            reject(err);
-          } else {
-            resolve(row);
-          }
-        }
-      );
-    });
+    const currentReview = await db.get(
+      `SELECT pr.*, e.department as employee_department
+       FROM PerformanceReviews pr
+       JOIN Users e ON pr.employee_id = e.id
+       WHERE pr.id = $1`,
+      [reviewId]
+    );
 
     if (!currentReview) {
       return res.status(404).json({
@@ -359,26 +394,34 @@ router.put('/:id', [
     const values = [];
 
     if (goals_set) {
-      updates.push('goals_set = ?');
+      updates.push('goals = $' + (values.length + 1));
       values.push(JSON.stringify(goals_set));
     }
     if (ratings) {
-      updates.push('ratings = ?');
+      updates.push('ratings = $' + (values.length + 1));
       values.push(JSON.stringify(ratings));
+      
+      // Calculate new overall score if ratings are updated
+      const ratingValues = Object.values(ratings).filter(v => typeof v === 'number');
+      if (ratingValues.length > 0) {
+        const overallScore = ratingValues.reduce((a, b) => a + b, 0) / ratingValues.length;
+        updates.push('overall_score = $' + (values.length + 1));
+        values.push(Math.round(overallScore * 100) / 100);
+      }
     }
     if (competencies) {
-      updates.push('competencies = ?');
+      updates.push('competencies = $' + (values.length + 1));
       values.push(JSON.stringify(competencies));
     }
     if (comments !== undefined) {
-      updates.push('comments = ?');
+      updates.push('comments = $' + (values.length + 1));
       values.push(comments);
     }
     if (status) {
-      updates.push('status = ?');
+      updates.push('status = $' + (values.length + 1));
       values.push(status);
     }
-
+    
     if (updates.length === 0) {
       return res.status(400).json({
         error: 'Bad Request',
@@ -386,30 +429,39 @@ router.put('/:id', [
       });
     }
 
+    // Add updated_at timestamp
     updates.push('updated_at = CURRENT_TIMESTAMP');
+    
+    // Add review ID for WHERE clause
     values.push(reviewId);
 
-    const sql = `UPDATE PerformanceReviews SET ${updates.join(', ')} WHERE id = ?`;
+    const sql = `UPDATE PerformanceReviews SET ${updates.join(', ')} WHERE id = $${values.length} RETURNING *`;
     
-    await db((resolve, reject) => {
-      db.run(sql, values, function(err) {
-        if (err) {
-          reject(err);
-        } else {
-          resolve();
-        }
-      });
+    const updatedReview = await db.get(sql, values).catch(error => {
+      console.error('Database error when updating review:', error);
+      throw new Error('Failed to update review in database');
     });
-
+    
+    if (!updatedReview) {
+      throw new Error('Failed to retrieve updated review data');
+    }
+    
     res.json({
-      message: 'Performance review updated successfully'
+      message: 'Review updated successfully',
+      review: {
+        ...updatedReview,
+        goals: safeJsonParse(updatedReview.goals, []),
+        ratings: safeJsonParse(updatedReview.ratings, {}),
+        competencies: safeJsonParse(updatedReview.competencies, {})
+      }
     });
-
   } catch (error) {
     console.error('Update review error:', error);
-    res.status(500).json({
-      error: 'Internal Server Error',
-      message: 'Failed to update performance review'
+    const statusCode = error.statusCode || 500;
+    res.status(statusCode).json({
+      error: statusCode === 500 ? 'Internal Server Error' : error.name || 'Error',
+      message: error.message || 'Failed to update performance review',
+      ...(process.env.NODE_ENV === 'development' && { stack: error.stack })
     });
   }
 });
@@ -423,22 +475,13 @@ router.post('/:id/submit', [
     const reviewId = req.params.id;
 
     // Get current review
-    const currentReview = await db((resolve, reject) => {
-      db.get(
-        `SELECT pr.*, e.department as employee_department
-         FROM PerformanceReviews pr
-         JOIN Users e ON pr.employee_id = e.id
-         WHERE pr.id = ?`,
-        [reviewId],
-        (err, row) => {
-          if (err) {
-            reject(err);
-          } else {
-            resolve(row);
-          }
-        }
-      );
-    });
+    const currentReview = await db.get(
+      `SELECT pr.*, e.department as employee_department
+       FROM PerformanceReviews pr
+       JOIN Users e ON pr.employee_id = e.id
+       WHERE pr.id = $1`,
+      [reviewId]
+    );
 
     if (!currentReview) {
       return res.status(404).json({
@@ -463,19 +506,10 @@ router.post('/:id/submit', [
     }
 
     // Update status to submitted
-    await db((resolve, reject) => {
-      db.run(
-        'UPDATE PerformanceReviews SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-        ['submitted', reviewId],
-        function(err) {
-          if (err) {
-            reject(err);
-          } else {
-            resolve();
-          }
-        }
-      );
-    });
+    await db.run(
+      'UPDATE PerformanceReviews SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      ['submitted', reviewId]
+    );
 
     res.json({
       message: 'Performance review submitted successfully'
@@ -500,22 +534,13 @@ router.post('/:id/approve', [
     const reviewId = req.params.id;
 
     // Get current review
-    const currentReview = await db((resolve, reject) => {
-      db.get(
-        `SELECT pr.*, e.department as employee_department
-         FROM PerformanceReviews pr
-         JOIN Users e ON pr.employee_id = e.id
-         WHERE pr.id = ?`,
-        [reviewId],
-        (err, row) => {
-          if (err) {
-            reject(err);
-          } else {
-            resolve(row);
-          }
-        }
-      );
-    });
+    const currentReview = await db.get(
+      `SELECT pr.*, e.department as employee_department
+       FROM PerformanceReviews pr
+       JOIN Users e ON pr.employee_id = e.id
+       WHERE pr.id = $1`,
+      [reviewId]
+    );
 
     if (!currentReview) {
       return res.status(404).json({
@@ -533,19 +558,10 @@ router.post('/:id/approve', [
     }
 
     // Update status to approved
-    await db((resolve, reject) => {
-      db.run(
-        'UPDATE PerformanceReviews SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-        ['approved', reviewId],
-        function(err) {
-          if (err) {
-            reject(err);
-          } else {
-            resolve();
-          }
-        }
-      );
-    });
+    await db.run(
+      'UPDATE PerformanceReviews SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      ['approved', reviewId]
+    );
 
     res.json({
       message: 'Performance review approved successfully'
@@ -580,7 +596,7 @@ router.get('/stats/overview', [
 
     // Apply department scope filtering
     if (req.departmentScope) {
-      sql += ' AND e.department = ?';
+      sql += ' AND e.department = $1';
       params.push(req.departmentScope);
     }
 
