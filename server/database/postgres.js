@@ -187,18 +187,24 @@ const createDevelopmentPlansTable = async () => {
 };
 
 const createSurveyResponsesTable = async () => {
-  const sql = `
-    CREATE TABLE IF NOT EXISTS SurveyResponses (
-      id SERIAL PRIMARY KEY,
-      user_id INTEGER REFERENCES Users(id) ON DELETE CASCADE,
-      survey_type VARCHAR(50) NOT NULL,
-      responses JSONB NOT NULL,
-      submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      department VARCHAR(50),
-      role VARCHAR(50)
-    )
-  `;
-  await pool.query(sql);
+  try {
+    const sql = `
+      CREATE TABLE IF NOT EXISTS "SurveyResponses" (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES "Users"(id) ON DELETE CASCADE,
+        survey_type VARCHAR(50) NOT NULL,
+        responses JSONB NOT NULL,
+        submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        department VARCHAR(50),
+        role VARCHAR(50)
+      )
+    `;
+    await pool.query(sql);
+    console.log('SurveyResponses table created or already exists');
+  } catch (error) {
+    console.error('Error creating SurveyResponses table:', error);
+    throw error;
+  }
 };
 
 const createAnalyticsCacheTable = async () => {
