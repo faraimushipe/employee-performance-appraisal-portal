@@ -15,7 +15,7 @@ router.get('/', [
     let sql = `
       SELECT id, email, first_name, last_name, department, role, employment_date, is_active, created_at
       FROM Users
-      WHERE is_active = 1
+      WHERE is_active = true
     `;
     const params = [];
 
@@ -189,7 +189,7 @@ router.get('/:id', [
     const sql = `
       SELECT id, email, first_name, last_name, department, role, employment_date, is_active, created_at
       FROM Users
-      WHERE id = ? AND is_active = 1
+      WHERE id = ? AND is_active = true
     `;
 
     try {
@@ -460,9 +460,9 @@ router.get('/stats/roles', [
       SELECT 
         role,
         COUNT(*) as count,
-        ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM Users WHERE is_active = 1), 2) as percentage
+        ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM Users WHERE is_active = true), 2) as percentage
       FROM Users
-      WHERE is_active = 1
+      WHERE is_active = true
     `;
     const params = [];
 
